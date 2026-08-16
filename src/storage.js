@@ -100,6 +100,7 @@ export function createStateRepository({
   let mode = "memory";
   let memoryRaw = null;
   let locked = false;
+  let lockedIssue = null;
 
   function read(storage) {
     if (!storage) {
@@ -117,14 +118,26 @@ export function createStateRepository({
     : read(sessionStorage).accessible ? "session" : "memory";
 
   function load() {
+    if (locked) {
+      return {
+        state: null,
+        issue: lockedIssue ?? issue(
+          "clear-required",
+          "Rensa den inkompatibla datan innan en ny profil sparas."
+        ),
+        mode
+      };
+    }
+
     const local = read(localStorage);
     const session = read(sessionStorage);
     let raw = null;
 
     if (local.raw !== null && session.raw !== null && local.raw !== session.raw) {
       locked = true;
+      lockedIssue = storageConflictIssue();
       mode = "local";
-      return { state: null, issue: storageConflictIssue(), mode };
+      return { state: null, issue: lockedIssue, mode };
     }
 
     if (local.raw !== null) {
@@ -147,6 +160,7 @@ export function createStateRepository({
     const decoded = decodeStoredState(raw);
     if (!decoded.ok) {
       locked = true;
+      lockedIssue = decoded.issue;
     }
     return {
       state: decoded.state,
@@ -228,9 +242,10 @@ export function createStateRepository({
 
   function storageConflict() {
     locked = true;
+    lockedIssue = storageConflictIssue();
     return {
       ok: false,
-      issue: storageConflictIssue(),
+      issue: lockedIssue,
       mode
     };
   }
@@ -329,6 +344,7 @@ export function createStateRepository({
     }
     memoryRaw = null;
     locked = false;
+    lockedIssue = null;
 
     const localAvailable = read(localStorage).accessible;
     const sessionAvailable = read(sessionStorage).accessible;

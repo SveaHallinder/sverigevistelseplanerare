@@ -392,6 +392,32 @@ test("decode errors take priority over fallback warnings during load", () => {
   });
 });
 
+test("a decode issue stays locked despite later storage changes", () => {
+  const invalidIssue = {
+    code: "invalid-json",
+    message: "Sparad data kunde inte läsas. Rensa den för att börja om."
+  };
+  const localStorage = createFakeStorage({
+    [STORAGE_KEY]: "{private-invalid-json"
+  });
+  const repository = createStateRepository({ localStorage });
+
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: invalidIssue,
+    mode: "local"
+  });
+  localStorage.values.set(STORAGE_KEY, serializeAppState(validState));
+  const readsBeforeLockedLoad = localStorage.calls.getItem.length;
+
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: invalidIssue,
+    mode: "local"
+  });
+  assert.equal(localStorage.calls.getItem.length, readsBeforeLockedLoad);
+});
+
 test("unsupported saved data remains unchanged and locks writes until clear", () => {
   const incompatibleRaw = JSON.stringify({
     version: 2,
@@ -751,8 +777,8 @@ test("unsafe session cleanup blocks memory and locks the repository", async (con
       sessionStorage.values.delete(STORAGE_KEY);
       assert.deepEqual(repository.load(), {
         state: null,
-        issue: null,
-        mode: "local"
+        issue: STORAGE_CONFLICT_ISSUE,
+        mode: "session"
       });
       assert.deepEqual(repository.save(nextState), {
         ok: false,
@@ -760,7 +786,7 @@ test("unsafe session cleanup blocks memory and locks the repository", async (con
           code: "clear-required",
           message: "Rensa den inkompatibla datan innan en ny profil sparas."
         },
-        mode: "local"
+        mode: "session"
       });
     });
   }
@@ -783,8 +809,8 @@ test("unreadable injected session storage blocks memory fallback", () => {
   sessionStorage.values.delete(STORAGE_KEY);
   assert.deepEqual(repository.load(), {
     state: null,
-    issue: null,
-    mode: "local"
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "session"
   });
 });
 
@@ -960,6 +986,51 @@ test("unverified session neutralization locks after a local save", async (contex
       assert.equal(localStorage.calls.setItem.length, 1);
     });
   }
+});
+
+test("a storage conflict cannot load stale session data before clear", () => {
+  const localStorage = createFakeStorage();
+  const sessionStorage = createFakeStorage({
+    [STORAGE_KEY]: serializeAppState(validState)
+  }, { removeItem: true, setItem: true });
+  const repository = createStateRepository({ localStorage, sessionStorage });
+  const nextState = { version: 1, profile: null, stays: [] };
+
+  assert.deepEqual(repository.save(nextState), {
+    ok: false,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "local"
+  });
+  localStorage.fail.getItem = true;
+  const localReadsBeforeLockedLoad = localStorage.calls.getItem.length;
+  const sessionReadsBeforeLockedLoad = sessionStorage.calls.getItem.length;
+
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "local"
+  });
+  assert.equal(localStorage.calls.getItem.length, localReadsBeforeLockedLoad);
+  assert.equal(sessionStorage.calls.getItem.length, sessionReadsBeforeLockedLoad);
+
+  localStorage.fail.getItem = false;
+  sessionStorage.fail.removeItem = false;
+  sessionStorage.fail.setItem = false;
+  assert.deepEqual(repository.clear(), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(repository.save(nextState), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
 });
 
 test("save rejects invalid state without attempting storage writes", () => {
