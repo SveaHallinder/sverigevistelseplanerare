@@ -1,6 +1,6 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, resolve, sep } from "node:path";
+import { extname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const LOG_PREFIX = "[sverigevistelseplanerare serve] ";
@@ -47,7 +47,11 @@ export function createStaticServer(rootDir) {
       const realRoot = await realpath(root);
       const realFilePath = await realpath(filePath);
       const insideRealRoot = realFilePath === realRoot || realFilePath.startsWith(realRoot + sep);
-      if (!insideRealRoot) {
+      const canonicalRelativePath = relative(realRoot, realFilePath).split(sep).join("/");
+      const hasCanonicalDotfile = canonicalRelativePath.split("/").some((part) =>
+        part.startsWith(".")
+      );
+      if (!insideRealRoot || hasCanonicalDotfile || !isAllowed(canonicalRelativePath)) {
         sendNotFound(response);
         return;
       }

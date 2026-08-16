@@ -135,6 +135,42 @@ test("server rejects symlinks that escape the public root", async (context) => {
   assert.deepEqual({ status: response.status, body }, { status: 404, body: "Not found" });
 });
 
+test("server rejects symlinks to non-public files inside the root", async (context) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "sv-plan-private-symlink-"));
+  context.after(() => rm(rootDir, { recursive: true, force: true }));
+  await mkdir(join(rootDir, "src"));
+  const envPath = join(rootDir, ".env");
+  const packagePath = join(rootDir, "package.json");
+  await writeFile(envPath, "PRIVATE_TOKEN=do-not-leak");
+  await writeFile(packagePath, "{\"private\":\"package content\"}");
+
+  try {
+    await symlink(envPath, join(rootDir, "src", "config.js"));
+    await symlink(packagePath, join(rootDir, "src", "package.js"));
+  } catch (error) {
+    if (["EACCES", "ENOSYS", "EPERM"].includes(error?.code)) {
+      context.skip("Symlänkar stöds inte på plattformen: " + error.code);
+      return;
+    }
+    throw error;
+  }
+
+  const server = createStaticServer(rootDir);
+  context.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const base = "http://127.0.0.1:" + address.port;
+  const results = await Promise.all(["/src/config.js", "/src/package.js"].map(async (path) => {
+    const response = await fetch(base + path);
+    return { status: response.status, body: await response.text() };
+  }));
+
+  assert.deepEqual(results, [
+    { status: 404, body: "Not found" },
+    { status: 404, body: "Not found" }
+  ]);
+});
+
 test("lint rejects trailing whitespace in non-JavaScript files", async (context) => {
   const rootDir = await mkdtemp(join(tmpdir(), "sv-plan-lint-"));
   context.after(() => rm(rootDir, { recursive: true, force: true }));
