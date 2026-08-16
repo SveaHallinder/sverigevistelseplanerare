@@ -1,5 +1,7 @@
 # Sverigevistelseplanerare MVP Implementation Plan
 
+> **Historisk och implementerad. Kör inte checklistan igen.** Planen beskriver den ursprungliga MVP-implementationen och flera kodsnuttar föregår senare säkerhets- och korrekthetsfixar. Nuvarande källkod och tester är auktoritativa. Fortsätt från `CLAUDE.md` och `docs/handoff/CURRENT.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
 **Goal:** Bygg en beroendefri, local-first webbapp där en redan utflyttad användare kan logga och planera Sverigebesök, följa en personlig dagbudget och se transparenta juridiska observationer utan att appen lämnar juridiska slutsatser.

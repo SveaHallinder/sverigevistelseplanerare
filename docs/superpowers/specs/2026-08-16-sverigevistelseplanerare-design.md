@@ -2,7 +2,7 @@
 
 Datum: 2026-08-16
 
-Status: Godkänd produktdesign, inväntar användarens granskning av den skrivna specifikationen
+Status: Implementerad MVP, automatiskt verifierad och manuellt QA-testad 2026-08-16
 
 ## 1. Mål
 
@@ -173,7 +173,7 @@ Appen visar längsta registrerade vistelse, antal besök, vistelsedagar och mell
 
 - ett sammanhängande registrerat intervall som når sin sexmånadersdag flaggas för granskning,
 - för två registrerade intervall jämförs det oregistrerade mellanrummet med intervallet före och efter,
-- om mellanrummet är högst lika långt som både föregående och efterföljande intervall visas "möjligt tillfälligt avbrott — kräver individuell bedömning",
+- om mellanrummet inte når sexmånadersgränsen och är högst lika långt som åtminstone det föregående eller efterföljande intervallet visas "möjligt tillfälligt avbrott — kräver individuell bedömning",
 - antal och periodicitet redovisas som fakta, men någon separat godtycklig gräns för "regelbundet" införs inte.
 
 Överlappande eller direkt angränsande intervall slås ihop innan observationerna räknas. Appen får inte avgöra om ett avbrott faktiskt är tillfälligt eller om vistelsen juridiskt är stadigvarande.
