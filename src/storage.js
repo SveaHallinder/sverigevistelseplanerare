@@ -282,6 +282,16 @@ export function createStateRepository({
 
   function save(state) {
     if (!locked) {
+      const local = localStorage === null ? null : read(localStorage);
+      const session = sessionStorage === null ? null : read(sessionStorage);
+      if (local !== null && !local.accessible) {
+        mode = "local";
+        return storageConflict();
+      }
+      if (session !== null && !session.accessible) {
+        mode = "session";
+        return storageConflict();
+      }
       load();
     }
     if (locked) {

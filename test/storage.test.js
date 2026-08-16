@@ -535,6 +535,99 @@ test("save preflights stored data before reading the candidate state", () => {
   assert.equal(localStorage.values.get(STORAGE_KEY), unsupportedRaw);
 });
 
+test("save blocks an unreadable local layer before the first load", () => {
+  const hiddenRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  const localStorage = createFakeStorage({
+    [STORAGE_KEY]: hiddenRaw
+  }, { getItem: true });
+  const repository = createStateRepository({ localStorage });
+
+  assert.deepEqual(repository.save(validState), {
+    ok: false,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "local"
+  });
+  assert.deepEqual(localStorage.calls.setItem, []);
+  assert.equal(localStorage.values.get(STORAGE_KEY), hiddenRaw);
+});
+
+test("save blocks an unreadable session layer for every local state", async (context) => {
+  const hiddenRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  const cases = [
+    { name: "empty local", localRaw: null },
+    { name: "valid local", localRaw: serializeAppState(validState) }
+  ];
+
+  for (const entry of cases) {
+    await context.test(entry.name, () => {
+      const localStorage = createFakeStorage(entry.localRaw === null
+        ? {}
+        : { [STORAGE_KEY]: entry.localRaw });
+      const sessionStorage = createFakeStorage({
+        [STORAGE_KEY]: hiddenRaw
+      }, { getItem: true });
+      const repository = createStateRepository({ localStorage, sessionStorage });
+
+      assert.deepEqual(repository.save({ version: 1, profile: null, stays: [] }), {
+        ok: false,
+        issue: STORAGE_CONFLICT_ISSUE,
+        mode: "session"
+      });
+      assert.deepEqual(localStorage.calls.setItem, []);
+      assert.deepEqual(sessionStorage.calls.setItem, []);
+      assert.equal(localStorage.values.get(STORAGE_KEY) ?? null, entry.localRaw);
+      assert.equal(sessionStorage.values.get(STORAGE_KEY), hiddenRaw);
+    });
+  }
+});
+
+test("save rechecks unreadable layers after a tolerated load", async (context) => {
+  const hiddenRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  const nextState = { version: 1, profile: null, stays: [] };
+  const cases = [
+    {
+      name: "unreadable local",
+      localStorage: createFakeStorage({ [STORAGE_KEY]: hiddenRaw }, { getItem: true }),
+      sessionStorage: createFakeStorage({
+        [STORAGE_KEY]: serializeAppState(nextState)
+      }),
+      loaded: { state: nextState, issue: SESSION_ISSUE, mode: "session" },
+      expectedMode: "local"
+    },
+    {
+      name: "unreadable session",
+      localStorage: createFakeStorage({
+        [STORAGE_KEY]: serializeAppState(validState)
+      }),
+      sessionStorage: createFakeStorage({ [STORAGE_KEY]: hiddenRaw }, { getItem: true }),
+      loaded: { state: validState, issue: null, mode: "local" },
+      expectedMode: "session"
+    }
+  ];
+
+  for (const entry of cases) {
+    await context.test(entry.name, () => {
+      const repository = createStateRepository({
+        localStorage: entry.localStorage,
+        sessionStorage: entry.sessionStorage
+      });
+
+      assert.deepEqual(repository.load(), entry.loaded);
+      assert.deepEqual(repository.save(nextState), {
+        ok: false,
+        issue: STORAGE_CONFLICT_ISSUE,
+        mode: entry.expectedMode
+      });
+      assert.deepEqual(entry.localStorage.calls.setItem, []);
+      assert.deepEqual(entry.sessionStorage.calls.setItem, []);
+      assert.equal(entry.localStorage.values.get(STORAGE_KEY),
+        entry.expectedMode === "local" ? hiddenRaw : serializeAppState(validState));
+      assert.equal(entry.sessionStorage.values.get(STORAGE_KEY),
+        entry.expectedMode === "session" ? hiddenRaw : serializeAppState(nextState));
+    });
+  }
+});
+
 test("unsupported saved data remains unchanged and locks writes until clear", () => {
   const incompatibleRaw = JSON.stringify({
     version: 2,
