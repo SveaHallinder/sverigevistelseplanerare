@@ -16,6 +16,13 @@ function fallbackIssue(mode) {
   return null;
 }
 
+function storageConflictIssue() {
+  return issue(
+    "storage-conflict",
+    "Äldre lokal data kunde inte ersättas. Rensa appdatan och försök igen."
+  );
+}
+
 export function decodeStoredState(raw) {
   if (raw === null) {
     return { ok: true, state: null, issue: null };
@@ -111,10 +118,14 @@ export function createStateRepository({
 
   function load() {
     const local = read(localStorage);
-    const session = local.raw === null
-      ? read(sessionStorage)
-      : { accessible: false, raw: null };
+    const session = read(sessionStorage);
     let raw = null;
+
+    if (local.raw !== null && session.raw !== null && local.raw !== session.raw) {
+      locked = true;
+      mode = "local";
+      return { state: null, issue: storageConflictIssue(), mode };
+    }
 
     if (local.raw !== null) {
       raw = local.raw;
@@ -158,8 +169,15 @@ export function createStateRepository({
   }
 
   function localFallbackStatus(raw) {
+    if (localStorage === null) {
+      return "available";
+    }
     const local = read(localStorage);
-    if (!local.accessible || local.raw === null) {
+    if (!local.accessible) {
+      mode = "local";
+      return "conflict";
+    }
+    if (local.raw === null) {
       return "available";
     }
     if (local.raw === raw) {
@@ -179,31 +197,65 @@ export function createStateRepository({
       : "conflict";
   }
 
+  function sessionFallbackStatus(raw) {
+    if (sessionStorage === null) {
+      return "available";
+    }
+    const session = read(sessionStorage);
+    if (!session.accessible) {
+      mode = "session";
+      return "conflict";
+    }
+    if (session.raw === null) {
+      return "available";
+    }
+    if (session.raw === raw) {
+      mode = "session";
+      return "saved";
+    }
+
+    mode = "session";
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      return "conflict";
+    }
+    const verified = read(sessionStorage);
+    return verified.accessible && verified.raw === null
+      ? "available"
+      : "conflict";
+  }
+
   function storageConflict() {
     locked = true;
     return {
       ok: false,
-      issue: issue(
-        "storage-conflict",
-        "Äldre lokal data kunde inte ersättas. Rensa appdatan och försök igen."
-      ),
+      issue: storageConflictIssue(),
       mode
     };
   }
 
   function neutralizeSession(raw) {
-    if (!sessionStorage) {
-      return;
+    if (sessionStorage === null) {
+      return true;
     }
     try {
       sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      try {
-        sessionStorage.setItem(STORAGE_KEY, raw);
-      } catch {
-        // Local data är fortsatt det prioriterade lagret.
+      const removed = read(sessionStorage);
+      if (removed.accessible && removed.raw === null) {
+        return true;
       }
+    } catch {
+      // Verifierad overwrite provas nedan.
     }
+
+    try {
+      sessionStorage.setItem(STORAGE_KEY, raw);
+    } catch {
+      // Read-back avgör om skrivningen ändå hann lyckas.
+    }
+    const overwritten = read(sessionStorage);
+    return overwritten.accessible && overwritten.raw === raw;
   }
 
   function save(state) {
@@ -231,14 +283,18 @@ export function createStateRepository({
 
     if (tryWrite(localStorage, "local", raw)) {
       memoryRaw = null;
-      neutralizeSession(raw);
+      if (!neutralizeSession(raw)) {
+        return storageConflict();
+      }
       return { ok: true, issue: null, mode };
     }
 
     const fallbackStatus = localFallbackStatus(raw);
     if (fallbackStatus === "saved") {
       memoryRaw = null;
-      neutralizeSession(raw);
+      if (!neutralizeSession(raw)) {
+        return storageConflict();
+      }
       return { ok: true, issue: null, mode };
     }
     if (fallbackStatus === "conflict") {
@@ -247,6 +303,15 @@ export function createStateRepository({
     if (tryWrite(sessionStorage, "session", raw)) {
       memoryRaw = null;
       return { ok: true, issue: fallbackIssue(mode), mode };
+    }
+
+    const memoryStatus = sessionFallbackStatus(raw);
+    if (memoryStatus === "saved") {
+      memoryRaw = null;
+      return { ok: true, issue: fallbackIssue(mode), mode };
+    }
+    if (memoryStatus === "conflict") {
+      return storageConflict();
     }
 
     memoryRaw = raw;
