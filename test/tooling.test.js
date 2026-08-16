@@ -282,17 +282,60 @@ test("lint ignores console text in comments and strings but rejects console call
   );
 });
 
+test("lint finds console calls after postfix increments without confusing division and regex", async (context) => {
+  const rootDir = await createLintRoot(context);
+  await writeFile(join(rootDir, "src", "safe.js"), [
+    "export const pattern = /console\\.log\\('bara regex'\\)/;",
+    "export const quotient = 8 / 2;",
+    "export const quoted = \"console.log('bara text')\";",
+    "export const template = `console.log('bara malltext')`;",
+    "// console.log('bara en kommentar')",
+    ""
+  ].join("\n"));
+
+  const safeResult = runLint(rootDir);
+
+  assert.equal(safeResult.status, 0, safeResult.stderr);
+
+  await Promise.all([
+    writeFile(join(rootDir, "src", "postfix-increment.js"), [
+      "let value = 8;",
+      "value++ / 2;",
+      "console.log('anrop efter increment');",
+      ""
+    ].join("\n")),
+    writeFile(join(rootDir, "src", "postfix-decrement.js"), [
+      "let value = 8;",
+      "value-- / 2;",
+      "console.log('anrop efter decrement');",
+      ""
+    ].join("\n"))
+  ]);
+
+  const unsafeResult = runLint(rootDir);
+
+  assert.notEqual(unsafeResult.status, 0);
+  assert.match(unsafeResult.stderr, /src\/postfix-increment\.js/);
+  assert.match(unsafeResult.stderr, /src\/postfix-decrement\.js/);
+});
+
 test("lint rejects optional and computed console calls", async (context) => {
   const rootDir = await createLintRoot(context);
   await Promise.all([
     writeFile(join(rootDir, "src", "optional.js"), "console?.info('anrop');\n"),
-    writeFile(join(rootDir, "src", "computed.js"), "console['warn']('anrop');\n")
+    writeFile(join(rootDir, "src", "computed.js"), "console['warn']('anrop');\n"),
+    writeFile(
+      join(rootDir, "src", "optional-computed.js"),
+      "console?.['warn']('anrop');\n"
+    )
   ]);
 
   const result = runLint(rootDir);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /src\/(?:computed|optional)\.js/);
+  assert.match(result.stderr, /src\/computed\.js/);
+  assert.match(result.stderr, /src\/optional\.js/);
+  assert.match(result.stderr, /src\/optional-computed\.js/);
 });
 
 test("lint requires noreferrer on external links", async (context) => {
@@ -317,4 +360,66 @@ test("lint requires noreferrer on external links", async (context) => {
   const safeResult = runLint(rootDir);
 
   assert.equal(safeResult.status, 0, safeResult.stderr);
+});
+
+test("lint requires noreferrer on runtime links in source files", async (context) => {
+  const rootDir = await createLintRoot(context);
+  await writeFile(join(rootDir, "src", "link.js"), [
+    "// '<a href=\"https://comment.example\" target=\"_blank\">Kommentar</a>'",
+    "export const note = true; // '<a target=\"_blank\">Inline-kommentar</a>'",
+    "/* '<a target=\"_blank\">Blockkommentar</a>' */",
+    "export function link(url) {",
+    "  return '<a href=\"' + url +",
+    "    '\" target=\"_blank\" rel=\"noopener\">Extern</a>';",
+    "}",
+    ""
+  ].join("\n"));
+
+  const unsafeResult = runLint(rootDir);
+
+  assert.notEqual(unsafeResult.status, 0);
+  assert.match(
+    unsafeResult.stderr,
+    /\[sverigevistelseplanerare lint\] Extern länk saknar rel="noreferrer": src\/link\.js/
+  );
+
+  await writeFile(join(rootDir, "src", "link.js"), [
+    "// '<a href=\"https://comment.example\" target=\"_blank\">Kommentar</a>'",
+    "export const note = true; // '<a target=\"_blank\">Inline-kommentar</a>'",
+    "/* '<a target=\"_blank\">Blockkommentar</a>' */",
+    "export function link(url) {",
+    "  return '<a href=\"' + url +",
+    "    '\" target=\"_blank\" rel=\"noopener noreferrer\">Extern</a>';",
+    "}",
+    ""
+  ].join("\n"));
+
+  const safeResult = runLint(rootDir);
+
+  assert.equal(safeResult.status, 0, safeResult.stderr);
+});
+
+test("lint policy covers the runtime source-link shape used by observations", async (context) => {
+  const rootDir = await createLintRoot(context);
+  const source = await readFile(
+    fileURLToPath(new URL("../src/ui/observations.js", import.meta.url)),
+    "utf8"
+  );
+  const unsafeSource = source.replace(
+    'rel="noopener noreferrer"',
+    'rel="noopener"'
+  );
+  assert.notEqual(unsafeSource, source, "Fixturen måste mutera observationslänkens rel-attribut.");
+  await mkdir(join(rootDir, "src", "ui"));
+  await writeFile(join(rootDir, "src", "ui", "observations.js"), source);
+
+  const safeResult = runLint(rootDir);
+
+  assert.equal(safeResult.status, 0, safeResult.stderr);
+
+  await writeFile(join(rootDir, "src", "ui", "observations.js"), unsafeSource);
+  const unsafeResult = runLint(rootDir);
+
+  assert.notEqual(unsafeResult.status, 0);
+  assert.match(unsafeResult.stderr, /src\/ui\/observations\.js/);
 });

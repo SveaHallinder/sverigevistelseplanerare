@@ -21,6 +21,9 @@ function report(message) {
 
 function canStartRegularExpression(masked, index) {
   const prefix = masked.slice(0, index).trimEnd();
+  if (/(?:\+\+|--)$/.test(prefix)) {
+    return false;
+  }
   if (prefix.length === 0 || /[({[=,:;!&|?+\-*%^~<>]$/.test(prefix)) {
     return true;
   }
@@ -135,9 +138,14 @@ function executableJavaScript(source) {
 }
 
 function hasConsoleCall(source) {
-  return /\bconsole\s*(?:(?:\.|\?\.)\s*[A-Za-z_$][\w$]*\s*(?:\?\.)?\s*\(|\[)/.test(
+  return /\bconsole\s*(?:(?:\.|\?\.)\s*[A-Za-z_$][\w$]*\s*(?:\?\.)?\s*\(|(?:\?\.)?\s*\[)/.test(
     executableJavaScript(source)
   );
+}
+
+function withoutJavaScriptComments(source) {
+  const commentOrLiteral = /("(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`)|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g;
+  return source.replace(commentOrLiteral, (match, literal) => literal ?? "");
 }
 
 function attributeValue(tag, name) {
@@ -154,6 +162,19 @@ function hasUnsafeExternalLink(html) {
     const href = attributeValue(tag, "href") ?? "";
     const rel = attributeValue(tag, "rel") ?? "";
     return /^https?:\/\//i.test(href) &&
+      !rel.split(/\s+/).some((value) => value.toLowerCase() === "noreferrer");
+  });
+}
+
+function hasUnsafeRuntimeLink(source) {
+  const markup = withoutJavaScriptComments(source);
+  if (hasUnsafeExternalLink(markup)) {
+    return true;
+  }
+  return [...markup.matchAll(/<a\b[\s\S]*?>/gi)].some(([tag]) => {
+    const target = attributeValue(tag, "target") ?? "";
+    const rel = attributeValue(tag, "rel") ?? "";
+    return target.toLowerCase() === "_blank" &&
       !rel.split(/\s+/).some((value) => value.toLowerCase() === "noreferrer");
   });
 }
@@ -184,6 +205,10 @@ async function lint() {
     const text = await readFile(path, "utf8");
     if (path.startsWith(join(root, "src")) && hasConsoleCall(text)) {
       report("Console-anrop är inte tillåtna i src: " + relative(root, path));
+      failed = true;
+    }
+    if (path.startsWith(join(root, "src")) && hasUnsafeRuntimeLink(text)) {
+      report('Extern länk saknar rel="noreferrer": ' + relative(root, path));
       failed = true;
     }
   }
