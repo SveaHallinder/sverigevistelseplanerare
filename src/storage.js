@@ -19,7 +19,7 @@ function fallbackIssue(mode) {
 function storageConflictIssue() {
   return issue(
     "storage-conflict",
-    "Äldre lokal data kunde inte ersättas. Rensa appdatan och försök igen."
+    "Sparad data har ändrats. Ladda om först. Rensa appdatan om problemet kvarstår."
   );
 }
 
@@ -106,6 +106,8 @@ export function createStateRepository({
 } = {}) {
   let mode = "memory";
   let memoryRaw = null;
+  let hasObservedPersistentRaw = false;
+  let observedPersistentRaw = null;
   let locked = false;
   let lockedIssue = null;
 
@@ -124,8 +126,14 @@ export function createStateRepository({
     ? "local"
     : read(sessionStorage).accessible ? "session" : "memory";
 
-  function loadSnapshots(local, session) {
+  function observePersistentRaw(raw) {
+    hasObservedPersistentRaw = true;
+    observedPersistentRaw = raw;
+  }
+
+  function loadSnapshots(local, session, guardObservedState = false) {
     let raw = null;
+    let persistentRaw = null;
 
     if (local.raw !== null && session.raw !== null && local.raw !== session.raw) {
       locked = true;
@@ -136,9 +144,11 @@ export function createStateRepository({
 
     if (local.raw !== null) {
       raw = local.raw;
+      persistentRaw = local.raw;
       mode = "local";
     } else if (session.raw !== null) {
       raw = session.raw;
+      persistentRaw = session.raw;
       mode = "session";
     } else if (memoryRaw !== null) {
       raw = memoryRaw;
@@ -151,10 +161,17 @@ export function createStateRepository({
       mode = "memory";
     }
 
+    if (guardObservedState && hasObservedPersistentRaw
+      && persistentRaw !== observedPersistentRaw) {
+      return storageConflict();
+    }
+
     const decoded = decodeStoredState(raw);
     if (!decoded.ok) {
       locked = true;
       lockedIssue = decoded.issue;
+    } else {
+      observePersistentRaw(persistentRaw);
     }
     return {
       state: decoded.state,
@@ -294,7 +311,10 @@ export function createStateRepository({
         mode = "session";
         return storageConflict();
       }
-      loadSnapshots(local, session);
+      const preflight = loadSnapshots(local, session, true);
+      if (preflight.ok === false) {
+        return preflight;
+      }
     }
     if (locked) {
       return {
@@ -323,6 +343,7 @@ export function createStateRepository({
       if (!neutralizeSession(raw)) {
         return storageConflict();
       }
+      observePersistentRaw(raw);
       return { ok: true, issue: null, mode };
     }
 
@@ -332,6 +353,7 @@ export function createStateRepository({
       if (!neutralizeSession(raw)) {
         return storageConflict();
       }
+      observePersistentRaw(raw);
       return { ok: true, issue: null, mode };
     }
     if (fallbackStatus === "conflict") {
@@ -339,12 +361,14 @@ export function createStateRepository({
     }
     if (tryWrite(sessionStorage, "session", raw)) {
       memoryRaw = null;
+      observePersistentRaw(raw);
       return { ok: true, issue: fallbackIssue(mode), mode };
     }
 
     const memoryStatus = sessionFallbackStatus(raw);
     if (memoryStatus === "saved") {
       memoryRaw = null;
+      observePersistentRaw(raw);
       return { ok: true, issue: fallbackIssue(mode), mode };
     }
     if (memoryStatus === "conflict") {
@@ -353,6 +377,7 @@ export function createStateRepository({
 
     memoryRaw = raw;
     mode = "memory";
+    observePersistentRaw(null);
     return { ok: true, issue: fallbackIssue(mode), mode };
   }
 
@@ -396,6 +421,7 @@ export function createStateRepository({
 
     locked = false;
     lockedIssue = null;
+    observePersistentRaw(null);
     return { ok: true, issue: null, mode };
   }
 

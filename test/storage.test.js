@@ -21,7 +21,7 @@ const MEMORY_ISSUE = {
 
 const STORAGE_CONFLICT_ISSUE = {
   code: "storage-conflict",
-  message: "Äldre lokal data kunde inte ersättas. Rensa appdatan och försök igen."
+  message: "Sparad data har ändrats. Ladda om först. Rensa appdatan om problemet kvarstår."
 };
 
 const CLEAR_FAILED_ISSUE = {
@@ -499,10 +499,7 @@ test("save preflights external storage changes on every call", () => {
 
   assert.deepEqual(repository.save(nextState), {
     ok: false,
-    issue: {
-      code: "clear-required",
-      message: "Rensa den inkompatibla datan innan en ny profil sparas."
-    },
+    issue: STORAGE_CONFLICT_ISSUE,
     mode: "local"
   });
   assert.equal(localStorage.calls.setItem.length, writesBeforeUnsafeSave);
@@ -585,6 +582,121 @@ test("save uses one session preflight snapshot when a second read would fail", (
   assert.deepEqual(localStorage.calls.setItem, []);
   assert.deepEqual(sessionStorage.calls.setItem, []);
   assert.equal(sessionStorage.values.get(STORAGE_KEY), unsupportedRaw);
+});
+
+test("a stale local repository cannot overwrite another repository's save", () => {
+  const winningState = { version: 1, profile: null, stays: [] };
+  const staleState = { ...validState, stays: [] };
+  const localStorage = createFakeStorage({
+    [STORAGE_KEY]: serializeAppState(validState)
+  });
+  const firstRepository = createStateRepository({ localStorage });
+  const staleRepository = createStateRepository({ localStorage });
+
+  assert.deepEqual(firstRepository.load(), {
+    state: validState,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(staleRepository.load(), {
+    state: validState,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(firstRepository.save(winningState), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+  const readsBeforeStaleSave = localStorage.calls.getItem.length;
+  const writesBeforeStaleSave = localStorage.calls.setItem.length;
+
+  assert.deepEqual(staleRepository.save(staleState), {
+    ok: false,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "local"
+  });
+  assert.equal(localStorage.calls.getItem.length, readsBeforeStaleSave + 1);
+  assert.equal(localStorage.calls.setItem.length, writesBeforeStaleSave);
+  assert.equal(localStorage.values.get(STORAGE_KEY), serializeAppState(winningState));
+  assert.deepEqual(staleRepository.load(), {
+    state: null,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "local"
+  });
+
+  const reloadedRepository = createStateRepository({ localStorage });
+  assert.deepEqual(reloadedRepository.load(), {
+    state: winningState,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(reloadedRepository.save(staleState), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+  assert.equal(localStorage.values.get(STORAGE_KEY), serializeAppState(staleState));
+});
+
+test("a stale session repository cannot overwrite another repository's save", () => {
+  const winningState = { version: 1, profile: null, stays: [] };
+  const staleState = { ...validState, stays: [] };
+  const localStorage = createFakeStorage({}, { setItem: true });
+  const sessionStorage = createFakeStorage({
+    [STORAGE_KEY]: serializeAppState(validState)
+  });
+  const firstRepository = createStateRepository({ localStorage, sessionStorage });
+  const staleRepository = createStateRepository({ localStorage, sessionStorage });
+
+  assert.deepEqual(firstRepository.load(), {
+    state: validState,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+  assert.deepEqual(staleRepository.load(), {
+    state: validState,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+  assert.deepEqual(firstRepository.save(winningState), {
+    ok: true,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+  const localReadsBeforeStaleSave = localStorage.calls.getItem.length;
+  const sessionReadsBeforeStaleSave = sessionStorage.calls.getItem.length;
+  const localWritesBeforeStaleSave = localStorage.calls.setItem.length;
+  const sessionWritesBeforeStaleSave = sessionStorage.calls.setItem.length;
+
+  assert.deepEqual(staleRepository.save(staleState), {
+    ok: false,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "session"
+  });
+  assert.equal(localStorage.calls.getItem.length, localReadsBeforeStaleSave + 1);
+  assert.equal(sessionStorage.calls.getItem.length, sessionReadsBeforeStaleSave + 1);
+  assert.equal(localStorage.calls.setItem.length, localWritesBeforeStaleSave);
+  assert.equal(sessionStorage.calls.setItem.length, sessionWritesBeforeStaleSave);
+  assert.equal(sessionStorage.values.get(STORAGE_KEY), serializeAppState(winningState));
+  assert.deepEqual(staleRepository.load(), {
+    state: null,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "session"
+  });
+
+  const reloadedRepository = createStateRepository({ localStorage, sessionStorage });
+  assert.deepEqual(reloadedRepository.load(), {
+    state: winningState,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+  assert.deepEqual(reloadedRepository.save(staleState), {
+    ok: true,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+  assert.equal(sessionStorage.values.get(STORAGE_KEY), serializeAppState(staleState));
 });
 
 test("save blocks an unreadable local layer before the first load", () => {
@@ -850,7 +962,7 @@ test("unsafe local cleanup blocks session writes and locks the repository", asyn
         ok: false,
         issue: {
           code: "storage-conflict",
-          message: "Äldre lokal data kunde inte ersättas. Rensa appdatan och försök igen."
+          message: "Sparad data har ändrats. Ladda om först. Rensa appdatan om problemet kvarstår."
         },
         mode: "local"
       });
