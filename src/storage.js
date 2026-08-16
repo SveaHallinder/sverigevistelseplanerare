@@ -23,6 +23,13 @@ function storageConflictIssue() {
   );
 }
 
+function clearFailedIssue() {
+  return issue(
+    "clear-failed",
+    "All appdata kunde inte rensas. Försök igen."
+  );
+}
+
 export function decodeStoredState(raw) {
   if (raw === null) {
     return { ok: true, state: null, issue: null };
@@ -274,6 +281,9 @@ export function createStateRepository({
   }
 
   function save(state) {
+    if (!locked) {
+      load();
+    }
     if (locked) {
       return {
         ok: false,
@@ -335,20 +345,45 @@ export function createStateRepository({
   }
 
   function clear() {
+    const results = [];
     for (const storage of [localStorage, sessionStorage]) {
-      try {
-        storage?.removeItem(STORAGE_KEY);
-      } catch {
-        // Rensning fortsätter i övriga tillgängliga lager.
+      if (storage === null) {
+        results.push({ present: false, accessible: false, raw: null });
+        continue;
       }
+      try {
+        storage.removeItem(STORAGE_KEY);
+      } catch {
+        // Read-back avgör om rensningen hann lyckas.
+      }
+      results.push({ present: true, ...read(storage) });
     }
     memoryRaw = null;
+
+    const [local, session] = results;
+    if (local.raw !== null) {
+      mode = "local";
+    } else if (session.raw !== null) {
+      mode = "session";
+    } else if (local.accessible) {
+      mode = "local";
+    } else if (session.accessible) {
+      mode = "session";
+    } else {
+      mode = "memory";
+    }
+
+    const failed = [local, session].some((result) => (
+      result.present && (!result.accessible || result.raw !== null)
+    ));
+    if (failed) {
+      locked = true;
+      lockedIssue = clearFailedIssue();
+      return { ok: false, issue: lockedIssue, mode };
+    }
+
     locked = false;
     lockedIssue = null;
-
-    const localAvailable = read(localStorage).accessible;
-    const sessionAvailable = read(sessionStorage).accessible;
-    mode = localAvailable ? "local" : sessionAvailable ? "session" : "memory";
     return { ok: true, issue: null, mode };
   }
 

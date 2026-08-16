@@ -24,6 +24,11 @@ const STORAGE_CONFLICT_ISSUE = {
   message: "Äldre lokal data kunde inte ersättas. Rensa appdatan och försök igen."
 };
 
+const CLEAR_FAILED_ISSUE = {
+  code: "clear-failed",
+  message: "All appdata kunde inte rensas. Försök igen."
+};
+
 const validProfile = {
   departureDate: "2025-05-10",
   budgetDays: 90,
@@ -416,6 +421,118 @@ test("a decode issue stays locked despite later storage changes", () => {
     mode: "local"
   });
   assert.equal(localStorage.calls.getItem.length, readsBeforeLockedLoad);
+});
+
+test("save preflights and preserves unsafe stored data before the first load", async (context) => {
+  const nextState = { version: 1, profile: null, stays: [] };
+  const cases = [
+    {
+      name: "unsupported local version",
+      localRaw: JSON.stringify({ version: 2, profile: null, stays: [] })
+    },
+    {
+      name: "invalid local JSON",
+      localRaw: "{private-invalid-json"
+    },
+    {
+      name: "invalid local schema",
+      localRaw: JSON.stringify({ version: 1, profile: null, stays: {} })
+    },
+    {
+      name: "unsupported session version",
+      sessionRaw: JSON.stringify({ version: 2, profile: null, stays: [] })
+    },
+    {
+      name: "invalid session JSON",
+      sessionRaw: "{private-invalid-json"
+    },
+    {
+      name: "different local and session states",
+      localRaw: serializeAppState(validState),
+      sessionRaw: serializeAppState(nextState)
+    }
+  ];
+
+  for (const entry of cases) {
+    await context.test(entry.name, () => {
+      const localStorage = entry.localRaw === undefined
+        ? null
+        : createFakeStorage({ [STORAGE_KEY]: entry.localRaw });
+      const sessionStorage = entry.sessionRaw === undefined
+        ? null
+        : createFakeStorage({ [STORAGE_KEY]: entry.sessionRaw });
+      const repository = createStateRepository({ localStorage, sessionStorage });
+
+      assert.deepEqual(repository.save(nextState), {
+        ok: false,
+        issue: {
+          code: "clear-required",
+          message: "Rensa den inkompatibla datan innan en ny profil sparas."
+        },
+        mode: localStorage === null ? "session" : "local"
+      });
+      if (localStorage !== null) {
+        assert.deepEqual(localStorage.calls.setItem, []);
+        assert.equal(localStorage.values.get(STORAGE_KEY), entry.localRaw);
+      }
+      if (sessionStorage !== null) {
+        assert.deepEqual(sessionStorage.calls.setItem, []);
+        assert.equal(sessionStorage.values.get(STORAGE_KEY), entry.sessionRaw);
+      }
+    });
+  }
+});
+
+test("save preflights external storage changes on every call", () => {
+  const localStorage = createFakeStorage();
+  const repository = createStateRepository({ localStorage });
+  const nextState = { version: 1, profile: null, stays: [] };
+
+  assert.deepEqual(repository.save(validState), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+  const writesBeforeUnsafeSave = localStorage.calls.setItem.length;
+  const unsupportedRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  localStorage.values.set(STORAGE_KEY, unsupportedRaw);
+
+  assert.deepEqual(repository.save(nextState), {
+    ok: false,
+    issue: {
+      code: "clear-required",
+      message: "Rensa den inkompatibla datan innan en ny profil sparas."
+    },
+    mode: "local"
+  });
+  assert.equal(localStorage.calls.setItem.length, writesBeforeUnsafeSave);
+  assert.equal(localStorage.values.get(STORAGE_KEY), unsupportedRaw);
+});
+
+test("save preflights stored data before reading the candidate state", () => {
+  const unsupportedRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  const localStorage = createFakeStorage({ [STORAGE_KEY]: unsupportedRaw });
+  const state = {};
+  let candidateReads = 0;
+  Object.defineProperty(state, "demo", {
+    get() {
+      candidateReads += 1;
+      throw new Error("candidate state must not be read");
+    }
+  });
+  const repository = createStateRepository({ localStorage });
+
+  assert.deepEqual(repository.save(state), {
+    ok: false,
+    issue: {
+      code: "clear-required",
+      message: "Rensa den inkompatibla datan innan en ny profil sparas."
+    },
+    mode: "local"
+  });
+  assert.equal(candidateReads, 0);
+  assert.deepEqual(localStorage.calls.setItem, []);
+  assert.equal(localStorage.values.get(STORAGE_KEY), unsupportedRaw);
 });
 
 test("unsupported saved data remains unchanged and locks writes until clear", () => {
@@ -1079,30 +1196,174 @@ test("save replaces unexpected serialization exceptions with a safe issue", () =
   assert.deepEqual(localStorage.calls.setItem, []);
 });
 
-test("clear removes only the namespaced key and continues after a remove failure", () => {
+test("clear stays locked when local data remains and succeeds only after retry", () => {
+  const staleRaw = serializeAppState(validState);
+  const currentRaw = serializeAppState({ version: 1, profile: null, stays: [] });
   const localStorage = createFakeStorage({
-    [STORAGE_KEY]: "local-state",
+    [STORAGE_KEY]: staleRaw,
     "foreign:key": "keep-local"
   }, { removeItem: true });
   const sessionStorage = createFakeStorage({
-    [STORAGE_KEY]: "session-state",
+    [STORAGE_KEY]: currentRaw,
     "other:key": "keep-session"
   });
   const repository = createStateRepository({ localStorage, sessionStorage });
 
-  assert.doesNotThrow(() => {
-    assert.deepEqual(repository.clear(), {
-      ok: true,
-      issue: null,
-      mode: "local"
-    });
+  assert.deepEqual(repository.clear(), {
+    ok: false,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "local"
   });
   assert.deepEqual(localStorage.calls.removeItem, [STORAGE_KEY]);
   assert.deepEqual(sessionStorage.calls.removeItem, [STORAGE_KEY]);
-  assert.equal(localStorage.values.get(STORAGE_KEY), "local-state");
+  assert.equal(localStorage.values.get(STORAGE_KEY), staleRaw);
   assert.equal(sessionStorage.values.has(STORAGE_KEY), false);
   assert.equal(localStorage.values.get("foreign:key"), "keep-local");
   assert.equal(sessionStorage.values.get("other:key"), "keep-session");
+
+  const localReadsBeforeLockedLoad = localStorage.calls.getItem.length;
+  const sessionReadsBeforeLockedLoad = sessionStorage.calls.getItem.length;
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "local"
+  });
+  assert.equal(localStorage.calls.getItem.length, localReadsBeforeLockedLoad);
+  assert.equal(sessionStorage.calls.getItem.length, sessionReadsBeforeLockedLoad);
+
+  localStorage.fail.removeItem = false;
+  assert.deepEqual(repository.clear(), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(localStorage.calls.removeItem, [STORAGE_KEY, STORAGE_KEY]);
+  assert.deepEqual(sessionStorage.calls.removeItem, [STORAGE_KEY, STORAGE_KEY]);
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: null,
+    mode: "local"
+  });
+  assert.deepEqual(repository.save({ version: 1, profile: null, stays: [] }), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+});
+
+test("clear accepts a remove exception when read-back verifies deletion", () => {
+  const localStorage = createFakeStorage({ [STORAGE_KEY]: "local-state" });
+  localStorage.removeItem = (key) => {
+    localStorage.calls.removeItem.push(key);
+    localStorage.values.delete(key);
+    throw new Error("removeItem failed after deletion");
+  };
+  const repository = createStateRepository({ localStorage });
+
+  assert.deepEqual(repository.clear(), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+  assert.equal(localStorage.values.has(STORAGE_KEY), false);
+});
+
+test("clear stays locked when removal cannot be verified", () => {
+  const localStorage = createFakeStorage({ [STORAGE_KEY]: "local-state" });
+  localStorage.removeItem = (key) => {
+    localStorage.calls.removeItem.push(key);
+    localStorage.values.delete(key);
+    localStorage.fail.getItem = true;
+  };
+  const repository = createStateRepository({ localStorage });
+
+  assert.deepEqual(repository.clear(), {
+    ok: false,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "memory"
+  });
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "memory"
+  });
+
+  localStorage.fail.getItem = false;
+  localStorage.removeItem = (key) => {
+    localStorage.calls.removeItem.push(key);
+    localStorage.values.delete(key);
+  };
+  assert.deepEqual(repository.clear(), {
+    ok: true,
+    issue: null,
+    mode: "local"
+  });
+});
+
+test("clear verifies a failed session removal after a memory fallback", () => {
+  const sessionStorage = createFakeStorage({}, { setItem: true });
+  const repository = createStateRepository({ sessionStorage });
+  const nextState = { version: 1, profile: null, stays: [] };
+
+  assert.deepEqual(repository.save(validState), {
+    ok: true,
+    issue: MEMORY_ISSUE,
+    mode: "memory"
+  });
+  const currentRaw = serializeAppState(nextState);
+  sessionStorage.values.set(STORAGE_KEY, currentRaw);
+  sessionStorage.fail.removeItem = true;
+
+  assert.deepEqual(repository.clear(), {
+    ok: false,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "session"
+  });
+  assert.equal(sessionStorage.values.get(STORAGE_KEY), currentRaw);
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "session"
+  });
+
+  sessionStorage.fail.removeItem = false;
+  sessionStorage.fail.setItem = false;
+  assert.deepEqual(repository.clear(), {
+    ok: true,
+    issue: null,
+    mode: "session"
+  });
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+  assert.deepEqual(repository.save(nextState), {
+    ok: true,
+    issue: SESSION_ISSUE,
+    mode: "session"
+  });
+});
+
+test("clear stays locked when session read-back is unavailable", () => {
+  const sessionStorage = createFakeStorage({ [STORAGE_KEY]: "session-state" });
+  sessionStorage.removeItem = (key) => {
+    sessionStorage.calls.removeItem.push(key);
+    sessionStorage.values.delete(key);
+    sessionStorage.fail.getItem = true;
+  };
+  const repository = createStateRepository({ sessionStorage });
+
+  assert.deepEqual(repository.clear(), {
+    ok: false,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "memory"
+  });
+  assert.deepEqual(repository.load(), {
+    state: null,
+    issue: CLEAR_FAILED_ISSUE,
+    mode: "memory"
+  });
 });
 
 test("storage failures never call console methods", () => {
