@@ -9,8 +9,17 @@ import { readProfileForm, renderOnboarding } from "../src/ui/onboarding.js";
 
 const cockpitModule = await import("../src/ui/cockpit.js").catch(() => ({}));
 const observationsModule = await import("../src/ui/observations.js").catch(() => ({}));
+const stayDialogModule = await import("../src/ui/stay-dialog.js").catch(() => ({}));
+const mainModule = await import("../src/main.js").catch(() => ({}));
 const { buildCockpitModel, renderCockpit, renderYearCalendar } = cockpitModule;
 const { renderObservations } = observationsModule;
+const {
+  closeStayDialog,
+  openStayDialog,
+  readStayForm,
+  renderStayDialog
+} = stayDialogModule;
+const { createBrowserApp } = mainModule;
 
 function render(overrides = {}) {
   return renderOnboarding({
@@ -447,4 +456,486 @@ test("cockpit CSS keeps calendar responsive and status markers non-colour-only",
   assert.match(css, /\.stay-row--planned/);
   assert.match(css, /\.observation a\s*\{[^}]*min-height:\s*2\.75rem/s);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
+});
+
+function requireStayDialogApi() {
+  assert.equal(typeof renderStayDialog, "function", "renderStayDialog ska exporteras");
+  assert.equal(typeof openStayDialog, "function", "openStayDialog ska exporteras");
+  assert.equal(typeof closeStayDialog, "function", "closeStayDialog ska exporteras");
+  assert.equal(typeof readStayForm, "function", "readStayForm ska exporteras");
+}
+
+function stayDialogModel(overrides = {}) {
+  return {
+    mode: overrides.mode ?? "create",
+    values: {
+      arrivalDate: "2026-08-20",
+      departureDate: "2026-08-22",
+      status: "planned",
+      ...overrides.values
+    },
+    fieldErrors: overrides.fieldErrors ?? {},
+    message: overrides.message ?? "",
+    preview: Object.hasOwn(overrides, "preview")
+      ? overrides.preview
+      : {
+          uniqueDays: 8,
+          budgetDays: 90,
+          remaining: 82,
+          candidateLastWithinBudgetDate: "2026-08-22",
+          candidateFirstExceededDate: null
+        },
+    deleteRequested: overrides.deleteRequested ?? false
+  };
+}
+
+test("renderStayDialog renders a labelled create form and inclusive preview", () => {
+  requireStayDialogApi();
+  const html = renderStayDialog(stayDialogModel());
+
+  assert.match(html, /<h2 id="stay-dialog-title">Lägg till vistelse<\/h2>/);
+  assert.match(html, /data-form="stay"/);
+  assert.match(html, /<label for="stay-arrivalDate">Ankomstdatum<\/label>/);
+  assert.match(html, /<label for="stay-departureDate">Avresedatum<\/label>/);
+  assert.match(html, /Ankomst- och avresedag räknas inkluderande/);
+  assert.match(html, /name="status" value="actual"/);
+  assert.match(html, /name="status" value="planned" checked/);
+  assert.match(html, /Efter vistelsen/);
+  assert.match(html, /8 \/ 90 registrerade dagar/);
+  assert.doesNotMatch(html, /data-action="request-delete"/);
+});
+
+test("renderStayDialog renders edit values before an explicit delete request", () => {
+  requireStayDialogApi();
+  const html = renderStayDialog(stayDialogModel({
+    mode: "edit",
+    values: {
+      arrivalDate: "2026-07-01",
+      departureDate: "2026-07-03",
+      status: "actual"
+    }
+  }));
+
+  assert.match(html, /<h2 id="stay-dialog-title">Redigera vistelse<\/h2>/);
+  assert.match(html, /name="arrivalDate"[^>]*value="2026-07-01"/);
+  assert.match(html, /name="status" value="actual" checked/);
+  assert.match(html, /data-action="request-delete"/);
+  assert.doesNotMatch(html, /data-action="confirm-delete"/);
+});
+
+test("renderStayDialog associates escaped field errors and requires delete confirmation", () => {
+  requireStayDialogApi();
+  const payload = '\"><img src=x onerror="alert(1)">';
+  const html = renderStayDialog(stayDialogModel({
+    mode: "edit",
+    values: {
+      arrivalDate: payload,
+      departureDate: "2026-07-03",
+      status: payload
+    },
+    fieldErrors: {
+      arrivalDate: "<strong>Kontrollera datumet</strong>",
+      status: payload
+    },
+    message: "<img src=x onerror=alert(2)>",
+    preview: null,
+    deleteRequested: true
+  }));
+
+  assert.doesNotMatch(html, /<img|<strong>/);
+  assert.match(html, /name="arrivalDate"[^>]*aria-invalid="true"[^>]*aria-describedby="stay-arrivalDate-error"/);
+  assert.match(html, /id="stay-arrivalDate-error"[^>]*>&lt;strong&gt;Kontrollera datumet&lt;\/strong&gt;/);
+  assert.match(html, /<fieldset[^>]*aria-invalid="true"[^>]*aria-describedby="stay-status-error"/);
+  assert.match(html, /Vill du ta bort vistelsen permanent\?/);
+  assert.match(html, /data-action="confirm-delete"/);
+  assert.match(html, /data-action="cancel-delete"/);
+  assert.doesNotMatch(html, /data-action="request-delete"/);
+});
+
+test("openStayDialog focuses arrival and closeStayDialog restores existing focus", () => {
+  requireStayDialogApi();
+  let arrivalFocuses = 0;
+  let returnFocuses = 0;
+  const arrival = { focus: () => { arrivalFocuses += 1; } };
+  const returnFocus = {
+    isConnected: true,
+    focus() {
+      returnFocuses += 1;
+    }
+  };
+  const dialog = {
+    innerHTML: "",
+    open: false,
+    querySelector: () => arrival,
+    showModal() {
+      this.open = true;
+    },
+    close() {
+      this.open = false;
+    }
+  };
+
+  openStayDialog(dialog, stayDialogModel(), returnFocus);
+  assert.equal(dialog.open, true);
+  assert.equal(arrivalFocuses, 1);
+  assert.match(dialog.innerHTML, /data-form="stay"/);
+
+  closeStayDialog(dialog);
+  assert.equal(dialog.open, false);
+  assert.equal(returnFocuses, 1);
+
+  returnFocus.isConnected = false;
+  openStayDialog(dialog, stayDialogModel(), returnFocus);
+  closeStayDialog(dialog);
+  assert.equal(returnFocuses, 1);
+});
+
+test("readStayForm returns only the stay input contract", () => {
+  requireStayDialogApi();
+  const NativeFormData = globalThis.FormData;
+  globalThis.FormData = class FormDataStub {
+    constructor(form) {
+      this.form = form;
+    }
+
+    get(name) {
+      return this.form[name] ?? null;
+    }
+  };
+
+  try {
+    assert.deepEqual(readStayForm({
+      arrivalDate: "2026-08-20",
+      departureDate: "2026-08-22",
+      status: "planned",
+      ignored: "secret"
+    }), {
+      arrivalDate: "2026-08-20",
+      departureDate: "2026-08-22",
+      status: "planned"
+    });
+  } finally {
+    globalThis.FormData = NativeFormData;
+  }
+});
+
+class FakeEventRoot {
+  constructor() {
+    this.handlers = new Map();
+    this.innerHTML = "";
+  }
+
+  addEventListener(type, handler) {
+    const handlers = this.handlers.get(type) ?? [];
+    handlers.push(handler);
+    this.handlers.set(type, handlers);
+  }
+
+  dispatch(type, event) {
+    for (const handler of this.handlers.get(type) ?? []) {
+      handler(event);
+    }
+  }
+}
+
+function actionTarget(action, dataset = {}) {
+  return {
+    dataset: { action, ...dataset },
+    isConnected: true,
+    focus() {},
+    closest(selector) {
+      return selector === "[data-action]" || selector === "[data-date]"
+        ? this
+        : null;
+    }
+  };
+}
+
+function fakeBrowserDocument() {
+  const app = new FakeEventRoot();
+  app.focusedSelectors = [];
+  app.querySelector = (selector) => {
+    app.focusedSelectors.push(selector);
+    return { focus() {}, isConnected: true };
+  };
+  const arrival = { focus() {}, isConnected: true };
+  const dialog = new FakeEventRoot();
+  dialog.open = false;
+  dialog.showModal = function showModal() {
+    this.open = true;
+  };
+  dialog.close = function close() {
+    this.open = false;
+  };
+  dialog.querySelector = (selector) => selector.includes("arrivalDate") ? arrival : null;
+  const liveRegion = { textContent: "" };
+  const nodes = {
+    "#app": app,
+    "#stay-dialog": dialog,
+    "#live-region": liveRegion
+  };
+  return {
+    app,
+    dialog,
+    liveRegion,
+    documentRef: {
+      querySelector(selector) {
+        return nodes[selector] ?? null;
+      }
+    }
+  };
+}
+
+function browserRepository(initialState) {
+  let state = initialState;
+  const calls = { save: [], clear: 0 };
+  return {
+    calls,
+    load() {
+      return { state, issue: null, mode: "local" };
+    },
+    save(nextState) {
+      calls.save.push(nextState);
+      state = nextState;
+      return { ok: true, issue: null, mode: "local" };
+    },
+    clear() {
+      calls.clear += 1;
+      state = null;
+      return { ok: true, issue: null, mode: "local" };
+    }
+  };
+}
+
+function withFormData(callback) {
+  const NativeFormData = globalThis.FormData;
+  globalThis.FormData = class FormDataStub {
+    constructor(form) {
+      this.form = form;
+    }
+
+    get(name) {
+      return this.form.fields[name] ?? null;
+    }
+  };
+  try {
+    return callback();
+  } finally {
+    globalThis.FormData = NativeFormData;
+  }
+}
+
+function stayForm(fields) {
+  return {
+    fields,
+    matches(selector) {
+      return selector === '[data-form="stay"]';
+    },
+    closest(selector) {
+      return selector === '[data-form="stay"]' ? this : null;
+    }
+  };
+}
+
+function createTestBrowserApp(state = cockpitState()) {
+  assert.equal(typeof createBrowserApp, "function", "createBrowserApp ska exporteras");
+  const browser = fakeBrowserDocument();
+  const repository = browserRepository(state);
+  const windowRef = {
+    crypto: { randomUUID: () => "browser-stay" },
+    confirm: () => true
+  };
+  const api = createBrowserApp({
+    documentRef: browser.documentRef,
+    windowRef,
+    repository,
+    today: "2026-08-16",
+    now: () => "2026-08-16T12:00:00.000Z",
+    makeId: () => "browser-stay"
+  });
+  return { ...browser, repository, windowRef, api };
+}
+
+test("main can be imported without browser globals and renders the loaded cockpit", () => {
+  const { app, api } = createTestBrowserApp();
+
+  assert.equal(typeof api.controller.getSnapshot, "function");
+  assert.match(app.innerHTML, /Din Sverigeöversikt/);
+});
+
+test("main reopens an invalid stay with field-linked errors", () => {
+  const { app, dialog, repository } = createTestBrowserApp();
+  app.dispatch("click", { target: actionTarget("add-stay") });
+  assert.equal(dialog.open, true);
+
+  const form = stayForm({
+    arrivalDate: "2026-08-22",
+    departureDate: "2026-08-20",
+    status: "planned"
+  });
+  withFormData(() => dialog.dispatch("submit", {
+    target: form,
+    preventDefault() {}
+  }));
+
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(dialog.open, true);
+  assert.match(
+    dialog.innerHTML,
+    /name="departureDate"[^>]*aria-invalid="true"[^>]*aria-describedby="stay-departureDate-error"/
+  );
+  assert.match(dialog.innerHTML, /Avresedatum måste vara samma dag eller senare/);
+});
+
+test("main update preview excludes the old interval", () => {
+  const state = cockpitState({
+    profile: { budgetDays: 5 },
+    stays: [{
+      id: "edit-me",
+      arrivalDate: "2026-08-01",
+      departureDate: "2026-08-05",
+      status: "planned",
+      createdAt: "2026-07-31T12:00:00.000Z",
+      updatedAt: "2026-07-31T12:00:00.000Z"
+    }]
+  });
+  const { app, dialog } = createTestBrowserApp(state);
+  app.dispatch("click", {
+    target: actionTarget("edit-stay", { stayId: "edit-me" })
+  });
+
+  const form = stayForm({
+    arrivalDate: "2026-08-10",
+    departureDate: "2026-08-14",
+    status: "planned"
+  });
+  withFormData(() => dialog.dispatch("change", {
+    target: { name: "departureDate", closest: () => form }
+  }));
+
+  assert.match(dialog.innerHTML, /5 \/ 5 registrerade dagar/);
+  assert.doesNotMatch(dialog.innerHTML, /10 \/ 5 registrerade dagar/);
+});
+
+test("main requires inline delete confirmation before removing a stay", () => {
+  const state = cockpitState({
+    stays: [{
+      id: "delete-me",
+      arrivalDate: "2026-08-01",
+      departureDate: "2026-08-05",
+      status: "planned",
+      createdAt: "2026-07-31T12:00:00.000Z",
+      updatedAt: "2026-07-31T12:00:00.000Z"
+    }]
+  });
+  const { app, dialog, repository } = createTestBrowserApp(state);
+  app.dispatch("click", {
+    target: actionTarget("edit-stay", { stayId: "delete-me" })
+  });
+
+  dialog.dispatch("click", { target: actionTarget("request-delete") });
+  assert.equal(repository.calls.save.length, 0);
+  assert.match(dialog.innerHTML, /data-action="confirm-delete"/);
+
+  dialog.dispatch("click", { target: actionTarget("confirm-delete") });
+  assert.equal(repository.calls.save.length, 1);
+  assert.deepEqual(repository.calls.save[0].stays, []);
+  assert.equal(dialog.open, false);
+});
+
+test("main moves focus to a rendered action when persist disconnects the opener", () => {
+  const { app, dialog } = createTestBrowserApp();
+  const opener = actionTarget("add-stay");
+  opener.isConnected = false;
+  app.dispatch("click", { target: opener });
+  const form = stayForm({
+    arrivalDate: "2026-08-20",
+    departureDate: "2026-08-22",
+    status: "planned"
+  });
+
+  withFormData(() => dialog.dispatch("submit", {
+    target: form,
+    preventDefault() {}
+  }));
+
+  assert.equal(dialog.open, false);
+  assert.ok(app.focusedSelectors.includes('[data-action="add-stay"]'));
+});
+
+test("main closes native dialog cancellation and restores opener focus", () => {
+  const { app, dialog } = createTestBrowserApp();
+  let focusCount = 0;
+  let prevented = 0;
+  const opener = actionTarget("add-stay");
+  opener.focus = () => { focusCount += 1; };
+  app.dispatch("click", { target: opener });
+
+  dialog.dispatch("cancel", {
+    preventDefault() {
+      prevented += 1;
+    }
+  });
+
+  assert.equal(prevented, 1);
+  assert.equal(dialog.open, false);
+  assert.equal(focusCount, 1);
+});
+
+test("main only clears all data after the browser confirmation", () => {
+  const { app, repository, windowRef } = createTestBrowserApp();
+  windowRef.confirm = () => false;
+
+  app.dispatch("click", { target: actionTarget("request-clear") });
+  assert.equal(repository.calls.clear, 0);
+
+  windowRef.confirm = () => true;
+  app.dispatch("click", { target: actionTarget("request-clear") });
+  assert.equal(repository.calls.clear, 1);
+  assert.match(app.innerHTML, /Planera Sverigedagar/);
+});
+
+test("main moves roving calendar focus across year boundaries and opens with Enter", () => {
+  const { app, dialog } = createTestBrowserApp();
+  let prevented = 0;
+  const keyEvent = (key, date) => ({
+    key,
+    target: actionTarget("select-date", { date }),
+    preventDefault() {
+      prevented += 1;
+    }
+  });
+
+  app.dispatch("keydown", keyEvent("ArrowRight", "2026-12-31"));
+  assert.ok(app.focusedSelectors.includes('[data-date="2027-01-01"]'));
+  app.dispatch("keydown", keyEvent("ArrowLeft", "2027-01-01"));
+  assert.ok(app.focusedSelectors.includes('[data-date="2026-12-31"]'));
+  app.dispatch("keydown", keyEvent("ArrowUp", "2026-08-08"));
+  assert.ok(app.focusedSelectors.includes('[data-date="2026-08-01"]'));
+  app.dispatch("keydown", keyEvent("ArrowDown", "2026-08-01"));
+  assert.ok(app.focusedSelectors.includes('[data-date="2026-08-08"]'));
+
+  app.dispatch("keydown", keyEvent("Enter", "2026-08-20"));
+  assert.equal(dialog.open, true);
+  assert.match(dialog.innerHTML, /name="arrivalDate"[^>]*value="2026-08-20"/);
+  assert.equal(prevented, 5);
+});
+
+test("main tolerates denied storage and crypto getters without console fallback", () => {
+  assert.equal(typeof createBrowserApp, "function", "createBrowserApp ska exporteras");
+  const browser = fakeBrowserDocument();
+  const windowRef = {};
+  Object.defineProperties(windowRef, {
+    localStorage: { get() { throw new Error("denied"); } },
+    sessionStorage: { get() { throw new Error("denied"); } },
+    crypto: { get() { throw new Error("denied"); } }
+  });
+
+  assert.doesNotThrow(() => createBrowserApp({
+    documentRef: browser.documentRef,
+    windowRef,
+    today: "2026-08-16",
+    now: () => "2026-08-16T12:00:00.000Z"
+  }));
+  assert.match(browser.app.innerHTML, /Planera Sverigedagar/);
 });
