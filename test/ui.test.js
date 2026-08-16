@@ -577,6 +577,22 @@ test("renderStayDialog renders a labelled create form and inclusive preview", ()
   assert.doesNotMatch(html, /data-action="request-delete"/);
 });
 
+test("renderStayDialog uses singular copy for one day over budget", () => {
+  requireStayDialogApi();
+  const html = renderStayDialog(stayDialogModel({
+    preview: {
+      uniqueDays: 91,
+      budgetDays: 90,
+      remaining: -1,
+      candidateLastWithinBudgetDate: null,
+      candidateFirstExceededDate: "2026-08-22"
+    }
+  }));
+
+  assert.match(html, /1 dag över din personliga budget/);
+  assert.doesNotMatch(html, /1 dagar över din personliga budget/);
+});
+
 test("renderStayDialog renders edit values before an explicit delete request", () => {
   requireStayDialogApi();
   const html = renderStayDialog(stayDialogModel({

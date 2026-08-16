@@ -28,6 +28,10 @@ function errorFor(errors, key) {
     : "";
 }
 
+function dayWord(count) {
+  return Math.abs(count) === 1 ? "dag" : "dagar";
+}
+
 function renderPreview(preview) {
   if (!preview) {
     return "";
@@ -41,9 +45,10 @@ function renderPreview(preview) {
         escapeHtml(preview.candidateLastWithinBudgetDate) + ".</p>"
       : "<p>Vistelsen har inga datum inom budgetperioden.</p>";
   const remaining = preview.remaining >= 0
-    ? escapeHtml(preview.remaining) + " dagar kvar i din personliga budget."
+    ? escapeHtml(preview.remaining) + " " + dayWord(preview.remaining) +
+      " kvar i din personliga budget."
     : escapeHtml(Math.abs(preview.remaining)) +
-      " dagar över din personliga budget.";
+      " " + dayWord(preview.remaining) + " över din personliga budget.";
 
   return '<aside class="stay-preview" aria-labelledby="stay-preview-title">' +
     '<h3 id="stay-preview-title">Efter vistelsen</h3><p><strong>' +
