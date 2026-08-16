@@ -50,12 +50,12 @@ async function lint() {
     }
   }
 
-  const textFiles = [
-    ...scripts,
+  const textFiles = [...new Set([
+    ...files,
     join(root, "index.html"),
     join(root, "styles.css"),
     packagePath
-  ];
+  ])];
 
   for (const path of textFiles) {
     if (/[ \t]+$/m.test(await readFile(path, "utf8"))) {

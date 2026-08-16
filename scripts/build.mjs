@@ -1,5 +1,5 @@
 import { cp, mkdir, rm } from "node:fs/promises";
-import { dirname, join, parse, resolve } from "node:path";
+import { dirname, join, parse, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -11,8 +11,18 @@ export async function build({
 } = {}) {
   const sourceRoot = resolve(rootDir);
   const outputRoot = resolve(outDir);
+  const sourcePaths = [
+    join(sourceRoot, "index.html"),
+    join(sourceRoot, "styles.css"),
+    join(sourceRoot, "src")
+  ];
+  const overlapsSource = sourcePaths.some((sourcePath) =>
+    sourcePath === outputRoot ||
+    sourcePath.startsWith(outputRoot + sep) ||
+    outputRoot.startsWith(sourcePath + sep)
+  );
 
-  if (outputRoot === sourceRoot || outputRoot === parse(outputRoot).root) {
+  if (outputRoot === sourceRoot || outputRoot === parse(outputRoot).root || overlapsSource) {
     throw new Error("[sverigevistelseplanerare build] Osäkert mål för build.");
   }
 

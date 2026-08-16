@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -44,13 +44,21 @@ export function createStaticServer(rootDir) {
         return;
       }
 
-      const info = await stat(filePath);
+      const realRoot = await realpath(root);
+      const realFilePath = await realpath(filePath);
+      const insideRealRoot = realFilePath === realRoot || realFilePath.startsWith(realRoot + sep);
+      if (!insideRealRoot) {
+        sendNotFound(response);
+        return;
+      }
+
+      const info = await stat(realFilePath);
       if (!info.isFile()) {
         sendNotFound(response);
         return;
       }
 
-      const body = await readFile(filePath);
+      const body = await readFile(realFilePath);
       response.writeHead(200, {
         "content-type": MIME[extname(filePath)] ?? "application/octet-stream",
         "cache-control": "no-store"
