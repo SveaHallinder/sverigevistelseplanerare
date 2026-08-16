@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createDemoState } from "../src/demo-state.js";
 import { CHECKLIST_KEYS } from "../src/domain/validation.js";
 import { CHECKLIST_CONTENT } from "../src/legal-content.js";
 import { serializeAppState } from "../src/storage.js";
 import { readProfileForm, renderOnboarding } from "../src/ui/onboarding.js";
+
+const cockpitModule = await import("../src/ui/cockpit.js").catch(() => ({}));
+const observationsModule = await import("../src/ui/observations.js").catch(() => ({}));
+const { buildCockpitModel, renderCockpit, renderYearCalendar } = cockpitModule;
+const { renderObservations } = observationsModule;
 
 function render(overrides = {}) {
   return renderOnboarding({
@@ -206,4 +212,239 @@ test("serializeAppState rejects the synthetic demo state", () => {
     () => serializeAppState(createDemoState("2026-08-16")),
     /Demoexemplet får inte sparas/
   );
+});
+
+function cockpitState(overrides = {}) {
+  const unansweredChecklist = Object.fromEntries(
+    CHECKLIST_KEYS.map((key) => [key, "unanswered"])
+  );
+  return {
+    version: 1,
+    profile: {
+      departureDate: "2025-02-15",
+      budgetDays: 5,
+      periodStart: "2026-01-01",
+      periodEnd: "2026-12-31",
+      swedishCitizen: "no",
+      livedInSwedenTenYears: "no",
+      connectionChecklist: unansweredChecklist,
+      ...overrides.profile
+    },
+    stays: overrides.stays ?? [
+      {
+        id: "actual-august",
+        arrivalDate: "2026-08-01",
+        departureDate: "2026-08-02",
+        status: "actual",
+        createdAt: "2026-07-31T12:00:00.000Z",
+        updatedAt: "2026-07-31T12:00:00.000Z"
+      },
+      {
+        id: "planned-august",
+        arrivalDate: "2026-08-02",
+        departureDate: "2026-08-06",
+        status: "planned",
+        createdAt: "2026-07-31T12:00:00.000Z",
+        updatedAt: "2026-07-31T12:00:00.000Z"
+      }
+    ]
+  };
+}
+
+function requireCockpitApi() {
+  assert.equal(typeof buildCockpitModel, "function", "buildCockpitModel ska exporteras");
+  assert.equal(typeof renderCockpit, "function", "renderCockpit ska exporteras");
+  assert.equal(typeof renderYearCalendar, "function", "renderYearCalendar ska exporteras");
+}
+
+test("cockpit exports its model and rendering API", () => {
+  requireCockpitApi();
+  assert.equal(typeof renderObservations, "function", "renderObservations ska exporteras");
+});
+
+test("buildCockpitModel preserves actual precedence and calculates overlap-aware KPIs", () => {
+  requireCockpitApi();
+  const model = buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026
+  });
+
+  assert.equal(model.budget.actualDays, 2);
+  assert.equal(model.budget.plannedDays, 5);
+  assert.equal(model.budget.uniqueDays, 6);
+  assert.equal(model.budget.overBy, 1);
+  assert.equal(model.budget.lastWithinBudgetDate, "2026-08-05");
+  assert.equal(model.statusByDate["2026-08-02"], "actual");
+});
+
+test("renderCockpit explains budget boundary and statuses with more than colour", () => {
+  requireCockpitApi();
+  const html = renderCockpit(buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026,
+    focusedDate: "2026-08-02"
+  }));
+
+  assert.match(html, /Senaste registrerade dag inom budget: 5 augusti 2026/);
+  assert.match(html, /Planen ligger 1 dag över din personliga budget/);
+  assert.match(html, /Faktiska dagar/);
+  assert.match(html, /Planerade dagar/);
+  assert.match(html, /class="legend[^>]*>[\s\S]*Faktisk[\s\S]*Planerad[\s\S]*Inte registrerad/);
+  assert.match(
+    html,
+    /data-date="2026-08-02"[^>]*data-status="actual"[^>]*aria-label="2 augusti 2026, faktisk vistelse"/
+  );
+  assert.match(html, /class="budget-meter"[^>]*role="progressbar"/);
+});
+
+test("renderYearCalendar has seven weekday headers per month and one roving tab stop", () => {
+  requireCockpitApi();
+  const model = buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026,
+    focusedDate: "2025-12-31"
+  });
+  const html = renderYearCalendar(model);
+
+  assert.equal((html.match(/<th scope="col">/g) ?? []).length, 12 * 7);
+  assert.equal((html.match(/<table aria-labelledby="month-/g) ?? []).length, 12);
+  assert.match(
+    html,
+    /Måndag[\s\S]*Tisdag[\s\S]*Onsdag[\s\S]*Torsdag[\s\S]*Fredag[\s\S]*Lördag[\s\S]*Söndag/
+  );
+  assert.equal((html.match(/tabindex="0"/g) ?? []).length, 1);
+  assert.match(html, /data-date="2026-01-01"[^>]*tabindex="0"/);
+  assert.match(html, /calendar-day__marker/);
+});
+
+test("renderCockpit shows an actionable empty state outside demo", () => {
+  requireCockpitApi();
+  const html = renderCockpit(buildCockpitModel(cockpitState({ stays: [] }), {
+    today: "2026-08-16",
+    year: 2026
+  }));
+
+  assert.match(html, /Inga Sverigedagar registrerade/);
+  assert.match(html, /Omarkerade dagar är inte registrerade/);
+  assert.match(html, /data-action="add-stay"/);
+});
+
+test("renderCockpit offers confirmation for a past planned stay", () => {
+  requireCockpitApi();
+  const html = renderCockpit(buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026
+  }));
+
+  assert.match(html, /data-action="confirm-actual" data-stay-id="planned-august"/);
+  assert.match(html, /class="stay-row stay-row--planned"[^>]*data-action="edit-stay"/);
+  assert.match(html, /Markera som genomförd/);
+});
+
+test("renderCockpit reports excluded dates neutrally", () => {
+  requireCockpitApi();
+  const state = cockpitState({
+    profile: {
+      periodStart: "2026-08-02",
+      periodEnd: "2026-08-05"
+    }
+  });
+  const html = renderCockpit(buildCockpitModel(state, {
+    today: "2026-08-16",
+    year: 2026
+  }));
+
+  assert.match(
+    html,
+    /class="budget-status__excluded">2 registrerade dagar ligger utanför budgetperioden och räknas inte\./
+  );
+  assert.doesNotMatch(html, /budget-status__excluded[^>]*validation|budget-status__excluded[^>]*danger/);
+});
+
+test("renderCockpit gives every legal observation evidence, source and review date", () => {
+  requireCockpitApi();
+  const model = buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026
+  });
+  const html = renderCockpit(model);
+
+  for (const observation of model.observations) {
+    assert.ok(html.includes(observation.title));
+    assert.ok(observation.evidence.every((item) => html.includes(item)));
+    assert.match(html, new RegExp('data-observation-id="' + observation.id + '"'));
+    assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+    assert.ok(html.includes("Senast granskad " + observation.reviewedAt));
+  }
+});
+
+test("renderCockpit demo exposes only exit-demo among mutating actions", () => {
+  requireCockpitApi();
+  const html = renderCockpit(buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026,
+    demo: true
+  }));
+
+  assert.match(html, /Syntetiskt demoexempel/);
+  assert.match(html, /data-action="exit-demo"/);
+  assert.doesNotMatch(html, /data-action="(?:add-stay|edit-stay|confirm-actual|request-clear)"/);
+});
+
+test("cockpit and observation renderers escape all dynamic content", () => {
+  requireCockpitApi();
+  assert.equal(typeof renderObservations, "function");
+  const payload = '"><img src=x onerror="alert(1)">';
+  const state = cockpitState({
+    stays: [{
+      ...cockpitState().stays[0],
+      id: payload,
+      status: payload
+    }]
+  });
+  const model = buildCockpitModel(state, {
+    today: "2026-08-16",
+    year: 2026,
+    storageIssue: { message: payload }
+  });
+  model.budget.actualDays = payload;
+  model.profile = { ...model.profile, budgetDays: payload };
+  const cockpitHtml = renderCockpit(model);
+  const observationHtml = renderObservations([{
+    id: payload,
+    level: payload,
+    scope: "actual",
+    title: payload,
+    summary: payload,
+    evidence: [payload],
+    sourceId: "unsafe",
+    reviewedAt: payload
+  }], {
+    unsafe: { title: payload, url: payload, reviewedAt: payload }
+  });
+
+  assert.doesNotMatch(cockpitHtml, /<img/);
+  assert.doesNotMatch(observationHtml, /<img/);
+  assert.ok(cockpitHtml.includes("&quot;&gt;&lt;img"));
+  assert.ok(observationHtml.includes("&quot;&gt;&lt;img"));
+  assert.match(observationHtml, /href="&quot;&gt;&lt;img/);
+});
+
+test("cockpit CSS keeps calendar responsive and status markers non-colour-only", async () => {
+  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+
+  assert.match(css, /\.year-calendar\s*\{[^}]*grid-template-columns:\s*repeat\(3,/s);
+  assert.match(css, /@media \(max-width:\s*61\.25rem\)[\s\S]*repeat\(2,/);
+  assert.match(css, /@media \(max-width:\s*39\.9375rem\)[\s\S]*grid-template-columns:\s*1fr/);
+  assert.match(css, /\.calendar-day--actual \.calendar-day__marker/);
+  assert.match(css, /\.calendar-day--planned \.calendar-day__marker/);
+  assert.match(css, /\.month-card\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.match(css, /\.month-card table\s*\{[^}]*min-width:\s*19\.25rem/s);
+  assert.match(
+    css,
+    /@media \(max-width:\s*90rem\)\s*\{[^}]*\.cockpit-layout\s*\{[^}]*grid-template-columns:\s*1fr/s
+  );
+  assert.match(css, /\.stay-row--planned/);
+  assert.match(css, /\.observation a\s*\{[^}]*min-height:\s*2\.75rem/s);
+  assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
 });
