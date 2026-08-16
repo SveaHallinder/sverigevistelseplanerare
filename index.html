@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Planera och dokumentera registrerade Sverigedagar.">
+    <title>Sverigevistelseplaneraren</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div id="storage-banner" hidden role="status"></div>
+    <main id="app" tabindex="-1">
+      <p>Laddar Sverigevistelseplaneraren.</p>
+    </main>
+    <div id="live-region" class="sr-only" aria-live="polite"></div>
+    <dialog id="stay-dialog" aria-labelledby="stay-dialog-title"></dialog>
+    <noscript>JavaScript måste vara aktiverat för att använda planeraren.</noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

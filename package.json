@@ -1,0 +1,17 @@
+{
+  "name": "sverigevistelseplanerare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs .",
+    "preview": "node scripts/serve.mjs dist",
+    "build": "node scripts/build.mjs",
+    "lint": "node scripts/lint.mjs",
+    "test": "node --test",
+    "check": "npm run lint && npm test && npm run build"
+  }
+}
