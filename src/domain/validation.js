@@ -1,7 +1,9 @@
 import { daysInclusive, isIsoDate } from "./dates.js";
 
-export const TRI_STATE = ["yes", "no", "unanswered"];
-export const CHECKLIST_KEYS = [
+const CANONICAL_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+export const TRI_STATE = Object.freeze(["yes", "no", "unanswered"]);
+export const CHECKLIST_KEYS = Object.freeze([
   "yearRoundHome",
   "spouseOrMinorChildren",
   "businessInSweden",
@@ -9,7 +11,7 @@ export const CHECKLIST_KEYS = [
   "propertyInSweden",
   "otherStrongTies",
   "workDuringStays"
-];
+]);
 
 function failed(fieldErrors, message = "Kontrollera de markerade fälten.") {
   return { ok: false, fieldErrors, message };
@@ -21,12 +23,31 @@ function normalizedTriState(value) {
     : value;
 }
 
+function normalizedBudgetDays(value) {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    return Number(value);
+  }
+  return Number.NaN;
+}
+
+function isCanonicalTimestamp(value) {
+  if (typeof value !== "string" || !CANONICAL_TIMESTAMP_PATTERN.test(value)) {
+    return false;
+  }
+
+  const timestamp = Date.parse(value);
+  return !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
 export function validateProfile(input) {
   const fieldErrors = {};
   const departureDate = input?.departureDate;
   const periodStart = input?.periodStart;
   const periodEnd = input?.periodEnd;
-  const budgetDays = Number(input?.budgetDays);
+  const budgetDays = normalizedBudgetDays(input?.budgetDays);
 
   if (!isIsoDate(departureDate)) {
     fieldErrors.departureDate = "Ange ett giltigt utflyttningsdatum.";
@@ -126,15 +147,19 @@ export function validateAppState(input) {
   }
 
   const stays = [];
+  const stayIds = new Set();
   for (const candidate of input.stays) {
     const stayResult = validateStayInput(candidate);
     const validMetadata = typeof candidate?.id === "string"
       && candidate.id.length > 0
-      && !Number.isNaN(Date.parse(candidate.createdAt))
-      && !Number.isNaN(Date.parse(candidate.updatedAt));
+      && !stayIds.has(candidate.id)
+      && isCanonicalTimestamp(candidate.createdAt)
+      && isCanonicalTimestamp(candidate.updatedAt)
+      && candidate.updatedAt >= candidate.createdAt;
     if (!stayResult.ok || !validMetadata) {
       return failed({}, "En sparad vistelse är ogiltig.");
     }
+    stayIds.add(candidate.id);
     stays.push({
       id: candidate.id,
       ...stayResult.value,

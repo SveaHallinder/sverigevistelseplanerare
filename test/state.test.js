@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as stateApi from "../src/domain/state.js";
+import { validateAppState } from "../src/domain/validation.js";
 
 const {
   addStay,
@@ -120,6 +121,7 @@ test("addStay appends exact metadata without mutating state or input", () => {
   assert.notEqual(result.value, state);
   assert.notEqual(result.value.stays, state.stays);
   assert.notEqual(result.value.stays[0], input);
+  assert.equal(validateAppState(result.value).ok, true);
 });
 
 test("addStay returns validation errors without changing state", () => {
@@ -139,6 +141,48 @@ test("addStay returns validation errors without changing state", () => {
     "Avresedatum måste vara samma dag eller senare än ankomstdatum."
   );
   assert.deepEqual(state, { version: 1, profile: null, stays: [] });
+});
+
+test("addStay rejects an id that is already in use without changing state", () => {
+  const state = { version: 1, profile: null, stays: [createdStay] };
+  const before = structuredClone(state);
+
+  const result = addStay(state, stayInput, {
+    id: "stay-1",
+    timestamp: "2026-08-17T12:00:00.000Z"
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    fieldErrors: {},
+    message: "Vistelsen kunde inte hanteras eftersom datan innehåller dubbletter."
+  });
+  assert.deepEqual(state, before);
+});
+
+test("addStay rejects invalid injected metadata without changing state", async (context) => {
+  const cases = [
+    { id: "", timestamp: "2026-08-16T12:00:00.000Z" },
+    { id: 1, timestamp: "2026-08-16T12:00:00.000Z" },
+    { id: "stay-1", timestamp: 0 },
+    { id: "stay-1", timestamp: "2026-08-16" },
+    { id: "stay-1", timestamp: "2026-02-29T12:00:00.000Z" }
+  ];
+
+  for (const metadata of cases) {
+    await context.test(JSON.stringify(metadata), () => {
+      const state = createEmptyState();
+      const before = structuredClone(state);
+      const result = addStay(state, stayInput, metadata);
+
+      assert.deepEqual(result, {
+        ok: false,
+        fieldErrors: {},
+        message: "Vistelsen kunde inte sparas eftersom id eller tidsstämpel är ogiltig."
+      });
+      assert.deepEqual(state, before);
+    });
+  }
 });
 
 test("updateStay preserves identity metadata and immutable reference boundaries", () => {
@@ -171,6 +215,7 @@ test("updateStay preserves identity metadata and immutable reference boundaries"
   assert.notEqual(result.value.stays[0], state.stays[0]);
   assert.equal(result.value.stays[1], state.stays[1]);
   assert.equal(result.value.profile, state.profile);
+  assert.equal(validateAppState(result.value).ok, true);
 });
 
 test("updateStay returns validation errors without changing the existing stay", () => {
@@ -202,6 +247,56 @@ test("updateStay reports an unknown id", () => {
   });
 });
 
+test("updateStay rejects duplicate ids without changing state", () => {
+  const state = {
+    version: 1,
+    profile: null,
+    stays: [createdStay, { ...createdStay }]
+  };
+  const before = structuredClone(state);
+
+  const result = updateStay(state, "stay-1", {
+    ...stayInput,
+    status: "actual"
+  }, { timestamp: "2026-08-17T12:00:00.000Z" });
+
+  assert.deepEqual(result, {
+    ok: false,
+    fieldErrors: {},
+    message: "Vistelsen kunde inte hanteras eftersom datan innehåller dubbletter."
+  });
+  assert.deepEqual(state, before);
+});
+
+test("updateStay rejects invalid injected timestamps without changing state", async (context) => {
+  const timestamps = [
+    0,
+    "2026-08-17",
+    "2026-02-29T12:00:00.000Z",
+    "2026-08-16T11:59:59.999Z"
+  ];
+
+  for (const timestamp of timestamps) {
+    await context.test(String(timestamp), () => {
+      const state = { version: 1, profile: null, stays: [createdStay] };
+      const before = structuredClone(state);
+      const result = updateStay(
+        state,
+        "stay-1",
+        { ...stayInput, status: "actual" },
+        { timestamp }
+      );
+
+      assert.deepEqual(result, {
+        ok: false,
+        fieldErrors: {},
+        message: "Vistelsen kunde inte sparas eftersom id eller tidsstämpel är ogiltig."
+      });
+      assert.deepEqual(state, before);
+    });
+  }
+});
+
 test("removeStay removes immutably and preserves retained stay references", () => {
   const retainedStay = { ...createdStay, id: "stay-2" };
   const state = { version: 1, profile: validProfile, stays: [createdStay, retainedStay] };
@@ -229,4 +324,22 @@ test("removeStay reports an unknown id", () => {
     fieldErrors: {},
     message: "Vistelsen kunde inte hittas."
   });
+});
+
+test("removeStay rejects duplicate ids without changing state", () => {
+  const state = {
+    version: 1,
+    profile: null,
+    stays: [createdStay, { ...createdStay }]
+  };
+  const before = structuredClone(state);
+
+  const result = removeStay(state, "stay-1");
+
+  assert.deepEqual(result, {
+    ok: false,
+    fieldErrors: {},
+    message: "Vistelsen kunde inte hanteras eftersom datan innehåller dubbletter."
+  });
+  assert.deepEqual(state, before);
 });

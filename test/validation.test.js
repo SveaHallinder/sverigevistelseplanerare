@@ -61,6 +61,11 @@ test("validation exports only the documented API", () => {
   ]);
 });
 
+test("validation rule collections are immutable", () => {
+  assert.equal(Object.isFrozen(TRI_STATE), true);
+  assert.equal(Object.isFrozen(CHECKLIST_KEYS), true);
+});
+
 test("validateProfile returns a normalized copy without mutating its input", () => {
   const input = {
     ...validProfile,
@@ -134,6 +139,28 @@ test("validateProfile rejects non-positive, decimal and oversized budgets", asyn
       assert.equal(result.ok, false);
       assert.equal(result.fieldErrors.budgetDays, expected);
       assert.equal(result.message, "Kontrollera de markerade fälten.");
+    });
+  }
+});
+
+test("validateProfile rejects permissive budget coercions", async (context) => {
+  const cases = [
+    ["boolean", true],
+    ["array", [90]],
+    ["object", { valueOf: () => 90 }],
+    ["whitespace", " 90 "],
+    ["exponent", "9e1"],
+    ["hex", "0x5a"]
+  ];
+
+  for (const [name, budgetDays] of cases) {
+    await context.test(name, () => {
+      const result = validateProfile({ ...validProfile, budgetDays });
+      assert.equal(result.ok, false);
+      assert.equal(
+        result.fieldErrors.budgetDays,
+        "Dagbudgeten måste vara ett heltal på minst 1."
+      );
     });
   }
 });
@@ -311,4 +338,59 @@ test("validateAppState rejects invalid stay data and metadata", async (context) 
       });
     });
   }
+});
+
+test("validateAppState accepts only canonical UTC ISO stay timestamps", async (context) => {
+  const cases = [
+    ["createdAt", 0],
+    ["createdAt", "2026-08-16"],
+    ["createdAt", "08/16/2026, 12:00:00"],
+    ["createdAt", "2026-02-29T12:00:00.000Z"],
+    ["createdAt", "2026-08-16T12:00:00.000+00:00"],
+    ["updatedAt", "2026-08-16T12:00:00Z"],
+    ["updatedAt", "2026-08-16T12:00:00.000"]
+  ];
+
+  for (const [field, value] of cases) {
+    await context.test(field + ": " + String(value), () => {
+      const stay = { ...validStoredStay, [field]: value };
+      assert.deepEqual(validateAppState({ version: 1, profile: null, stays: [stay] }), {
+        ok: false,
+        fieldErrors: {},
+        message: "En sparad vistelse är ogiltig."
+      });
+    });
+  }
+});
+
+test("validateAppState rejects stay metadata updated before it was created", () => {
+  const stay = {
+    ...validStoredStay,
+    createdAt: "2026-08-16T12:00:00.000Z",
+    updatedAt: "2026-08-16T11:59:59.999Z"
+  };
+
+  assert.deepEqual(validateAppState({ version: 1, profile: null, stays: [stay] }), {
+    ok: false,
+    fieldErrors: {},
+    message: "En sparad vistelse är ogiltig."
+  });
+});
+
+test("validateAppState rejects duplicate stay ids", () => {
+  const duplicate = {
+    ...validStoredStay,
+    arrivalDate: "2026-09-01",
+    departureDate: "2026-09-02"
+  };
+
+  assert.deepEqual(validateAppState({
+    version: 1,
+    profile: null,
+    stays: [validStoredStay, duplicate]
+  }), {
+    ok: false,
+    fieldErrors: {},
+    message: "En sparad vistelse är ogiltig."
+  });
 });
