@@ -124,20 +124,7 @@ export function createStateRepository({
     ? "local"
     : read(sessionStorage).accessible ? "session" : "memory";
 
-  function load() {
-    if (locked) {
-      return {
-        state: null,
-        issue: lockedIssue ?? issue(
-          "clear-required",
-          "Rensa den inkompatibla datan innan en ny profil sparas."
-        ),
-        mode
-      };
-    }
-
-    const local = read(localStorage);
-    const session = read(sessionStorage);
+  function loadSnapshots(local, session) {
     let raw = null;
 
     if (local.raw !== null && session.raw !== null && local.raw !== session.raw) {
@@ -174,6 +161,21 @@ export function createStateRepository({
       issue: decoded.issue ?? fallbackIssue(mode),
       mode
     };
+  }
+
+  function load() {
+    if (locked) {
+      return {
+        state: null,
+        issue: lockedIssue ?? issue(
+          "clear-required",
+          "Rensa den inkompatibla datan innan en ny profil sparas."
+        ),
+        mode
+      };
+    }
+
+    return loadSnapshots(read(localStorage), read(sessionStorage));
   }
 
   function tryWrite(storage, nextMode, raw) {
@@ -282,17 +284,17 @@ export function createStateRepository({
 
   function save(state) {
     if (!locked) {
-      const local = localStorage === null ? null : read(localStorage);
-      const session = sessionStorage === null ? null : read(sessionStorage);
-      if (local !== null && !local.accessible) {
+      const local = read(localStorage);
+      const session = read(sessionStorage);
+      if (localStorage !== null && !local.accessible) {
         mode = "local";
         return storageConflict();
       }
-      if (session !== null && !session.accessible) {
+      if (sessionStorage !== null && !session.accessible) {
         mode = "session";
         return storageConflict();
       }
-      load();
+      loadSnapshots(local, session);
     }
     if (locked) {
       return {

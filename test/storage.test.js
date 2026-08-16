@@ -535,6 +535,58 @@ test("save preflights stored data before reading the candidate state", () => {
   assert.equal(localStorage.values.get(STORAGE_KEY), unsupportedRaw);
 });
 
+test("save uses one local preflight snapshot when a second read would fail", () => {
+  const unsupportedRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  const localStorage = createFakeStorage({ [STORAGE_KEY]: unsupportedRaw });
+  const repository = createStateRepository({ localStorage });
+  let reads = 0;
+  localStorage.getItem = (key) => {
+    localStorage.calls.getItem.push(key);
+    reads += 1;
+    if (reads === 2) throw new Error("transient getItem failure");
+    return localStorage.values.has(key) ? localStorage.values.get(key) : null;
+  };
+
+  assert.deepEqual(repository.save(validState), {
+    ok: false,
+    issue: {
+      code: "clear-required",
+      message: "Rensa den inkompatibla datan innan en ny profil sparas."
+    },
+    mode: "local"
+  });
+  assert.equal(reads, 1);
+  assert.deepEqual(localStorage.calls.setItem, []);
+  assert.equal(localStorage.values.get(STORAGE_KEY), unsupportedRaw);
+});
+
+test("save uses one session preflight snapshot when a second read would fail", () => {
+  const unsupportedRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
+  const localStorage = createFakeStorage();
+  const sessionStorage = createFakeStorage({ [STORAGE_KEY]: unsupportedRaw });
+  const repository = createStateRepository({ localStorage, sessionStorage });
+  let reads = 0;
+  sessionStorage.getItem = (key) => {
+    sessionStorage.calls.getItem.push(key);
+    reads += 1;
+    if (reads === 2) throw new Error("transient getItem failure");
+    return sessionStorage.values.has(key) ? sessionStorage.values.get(key) : null;
+  };
+
+  assert.deepEqual(repository.save(validState), {
+    ok: false,
+    issue: {
+      code: "clear-required",
+      message: "Rensa den inkompatibla datan innan en ny profil sparas."
+    },
+    mode: "session"
+  });
+  assert.equal(reads, 1);
+  assert.deepEqual(localStorage.calls.setItem, []);
+  assert.deepEqual(sessionStorage.calls.setItem, []);
+  assert.equal(sessionStorage.values.get(STORAGE_KEY), unsupportedRaw);
+});
+
 test("save blocks an unreadable local layer before the first load", () => {
   const hiddenRaw = JSON.stringify({ version: 2, profile: null, stays: [] });
   const localStorage = createFakeStorage({
