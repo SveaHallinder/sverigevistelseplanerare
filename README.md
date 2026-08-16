@@ -1,0 +1,29 @@
+# Sverigevistelseplaneraren
+
+En lokal MVP för att dokumentera och planera registrerade Sverigedagar.
+
+## Förutsättning
+
+Node.js 20 eller senare är den enda förutsättningen.
+
+## Starta lokalt
+
+~~~bash
+npm run dev
+~~~
+
+Öppna localhost-URL:en som servern skriver ut.
+
+## Kontrollera projektet
+
+~~~bash
+npm run check
+~~~
+
+Kommandot kör lint, automatiska tester och build.
+
+## Data och MVP-gräns
+
+Data sparas lokalt i den aktuella webbläsaren. Rensa all lokal appdata genom att klicka på **Rensa all data** i UI:t och bekräfta rensningen.
+
+Verktyget fastslår inte skattehemvist eller juridisk säkerhet och ersätter inte individuell juridisk rådgivning. Konto och molnsynk ingår inte i MVP:n.

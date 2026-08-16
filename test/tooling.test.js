@@ -8,6 +8,31 @@ import { fileURLToPath } from "node:url";
 import { build } from "../scripts/build.mjs";
 import { createStaticServer } from "../scripts/serve.mjs";
 
+const lintPath = fileURLToPath(new URL("../scripts/lint.mjs", import.meta.url));
+
+async function createLintRoot(context) {
+  const rootDir = await mkdtemp(join(tmpdir(), "sv-plan-lint-"));
+  context.after(() => rm(rootDir, { recursive: true, force: true }));
+  await Promise.all([
+    mkdir(join(rootDir, "src")),
+    mkdir(join(rootDir, "scripts")),
+    mkdir(join(rootDir, "test"))
+  ]);
+  await Promise.all([
+    writeFile(join(rootDir, "index.html"), "<main>ok</main>\n"),
+    writeFile(join(rootDir, "styles.css"), "body {}\n"),
+    writeFile(join(rootDir, "package.json"), "{}\n")
+  ]);
+  return rootDir;
+}
+
+function runLint(rootDir) {
+  return spawnSync(process.execPath, [lintPath], {
+    cwd: rootDir,
+    encoding: "utf8"
+  });
+}
+
 test("build copies only public application files", async (context) => {
   const rootDir = await mkdtemp(join(tmpdir(), "sv-plan-root-"));
   const outDir = await mkdtemp(join(tmpdir(), "sv-plan-out-"));
@@ -15,11 +40,23 @@ test("build copies only public application files", async (context) => {
     rm(rootDir, { recursive: true, force: true }),
     rm(outDir, { recursive: true, force: true })
   ]));
-  await mkdir(join(rootDir, "src"));
+  await Promise.all([
+    mkdir(join(rootDir, "src")),
+    mkdir(join(rootDir, "docs")),
+    mkdir(join(rootDir, "test")),
+    mkdir(join(rootDir, ".git")),
+    mkdir(join(rootDir, "mockups"))
+  ]);
   await writeFile(join(rootDir, "index.html"), "<main>app</main>");
   await writeFile(join(rootDir, "styles.css"), "body{}");
   await writeFile(join(rootDir, "src", "main.js"), "export const ready = true;");
   await writeFile(join(rootDir, "secret.txt"), "never copy");
+  await Promise.all([
+    writeFile(join(rootDir, "docs", "notes.md"), "private docs"),
+    writeFile(join(rootDir, "test", "app.test.js"), "private tests"),
+    writeFile(join(rootDir, ".git", "config"), "private git data"),
+    writeFile(join(rootDir, "mockups", "stored.html"), "private mockup")
+  ]);
 
   await build({ rootDir, outDir });
 
@@ -30,6 +67,14 @@ test("build copies only public application files", async (context) => {
     "export const ready = true;"
   );
   await assert.rejects(readFile(join(outDir, "secret.txt"), "utf8"), { code: "ENOENT" });
+  for (const privatePath of [
+    join("docs", "notes.md"),
+    join("test", "app.test.js"),
+    join(".git", "config"),
+    join("mockups", "stored.html")
+  ]) {
+    await assert.rejects(readFile(join(outDir, privatePath), "utf8"), { code: "ENOENT" });
+  }
 });
 
 test("build rejects output directories that contain the source root", async (context) => {
@@ -102,6 +147,19 @@ test("server serves index and rejects dotfiles", async (context) => {
   assert.equal(styleResponse.headers.get("cache-control"), "no-store");
   assert.equal(scriptResponse.headers.get("cache-control"), "no-store");
   assert.equal((await fetch(base + "/.hidden")).status, 404);
+  assert.equal((await fetch(base + "/missing.js")).status, 404);
+  assert.equal((await fetch(base + "/%2e%2e%2fpackage.json")).status, 404);
+});
+
+test("index exposes the required Swedish accessible application landmarks", async () => {
+  const html = await readFile(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+
+  assert.match(html, /<html\s+lang="sv">/);
+  assert.match(html, /<meta\s+name="viewport"\s+content="[^"]+">/);
+  assert.match(html, /<main\b[^>]*>/);
+  assert.match(html, /<[^>]+\bid="live-region"[^>]+\baria-live="polite"[^>]*>/);
+  assert.match(html, /<dialog\b[^>]*>/);
+  assert.match(html, /<noscript\b[^>]*>/);
 });
 
 test("server rejects symlinks that escape the public root", async (context) => {
@@ -172,26 +230,91 @@ test("server rejects symlinks to non-public files inside the root", async (conte
 });
 
 test("lint rejects trailing whitespace in non-JavaScript files", async (context) => {
-  const rootDir = await mkdtemp(join(tmpdir(), "sv-plan-lint-"));
-  context.after(() => rm(rootDir, { recursive: true, force: true }));
-  await Promise.all([
-    mkdir(join(rootDir, "src")),
-    mkdir(join(rootDir, "scripts")),
-    mkdir(join(rootDir, "test"))
-  ]);
-  await Promise.all([
-    writeFile(join(rootDir, "index.html"), "<main>ok</main>\n"),
-    writeFile(join(rootDir, "styles.css"), "body {}\n"),
-    writeFile(join(rootDir, "package.json"), "{}\n"),
-    writeFile(join(rootDir, "test", "notes.txt"), "trailing whitespace  \n")
-  ]);
-  const lintPath = fileURLToPath(new URL("../scripts/lint.mjs", import.meta.url));
+  const rootDir = await createLintRoot(context);
+  await writeFile(join(rootDir, "test", "notes.txt"), "trailing whitespace  \n");
 
-  const result = spawnSync(process.execPath, [lintPath], {
-    cwd: rootDir,
+  const result = runLint(rootDir);
+
+  assert.notEqual(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stderr, /Trailing whitespace: .*notes\.txt/);
+});
+
+test("lint syntax-checks every JavaScript file below src", async (context) => {
+  const rootDir = await createLintRoot(context);
+  await mkdir(join(rootDir, "src", "nested"));
+  const brokenPath = join(rootDir, "src", "nested", "broken.js");
+  await writeFile(brokenPath, "const answer = ;\n");
+
+  const directResult = spawnSync(process.execPath, ["--check", brokenPath], {
     encoding: "utf8"
   });
+  assert.notEqual(directResult.status, 0, "Testfixturen måste innehålla ogiltig JavaScript.");
+
+  const result = runLint(rootDir);
+
+  assert.notEqual(result.status, 0, result.stderr || result.stdout);
+  assert.match(
+    result.stderr,
+    /\[sverigevistelseplanerare lint\] Syntaxfel i src\/nested\/broken\.js/
+  );
+});
+
+test("lint ignores console text in comments and strings but rejects console calls", async (context) => {
+  const rootDir = await createLintRoot(context);
+  await writeFile(join(rootDir, "src", "safe.js"), [
+    "// console.log('bara en kommentar')",
+    "export const quoted = \"console.error('bara text')\";",
+    "export const template = `console.warn('bara malltext')`;",
+    ""
+  ].join("\n"));
+
+  const safeResult = runLint(rootDir);
+
+  assert.equal(safeResult.status, 0, safeResult.stderr);
+
+  await writeFile(join(rootDir, "src", "unsafe.js"), "console.info('anrop');\n");
+  const unsafeResult = runLint(rootDir);
+
+  assert.notEqual(unsafeResult.status, 0);
+  assert.match(
+    unsafeResult.stderr,
+    /\[sverigevistelseplanerare lint\] Console-anrop är inte tillåtna i src: src\/unsafe\.js/
+  );
+});
+
+test("lint rejects optional and computed console calls", async (context) => {
+  const rootDir = await createLintRoot(context);
+  await Promise.all([
+    writeFile(join(rootDir, "src", "optional.js"), "console?.info('anrop');\n"),
+    writeFile(join(rootDir, "src", "computed.js"), "console['warn']('anrop');\n")
+  ]);
+
+  const result = runLint(rootDir);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Trailing whitespace: .*notes\.txt/);
+  assert.match(result.stderr, /src\/(?:computed|optional)\.js/);
+});
+
+test("lint requires noreferrer on external links", async (context) => {
+  const rootDir = await createLintRoot(context);
+  await writeFile(
+    join(rootDir, "index.html"),
+    '<a href="https://example.com" rel="noopener">Extern</a>\n'
+  );
+
+  const unsafeResult = runLint(rootDir);
+
+  assert.notEqual(unsafeResult.status, 0);
+  assert.match(
+    unsafeResult.stderr,
+    /\[sverigevistelseplanerare lint\] Extern länk saknar rel="noreferrer": index\.html/
+  );
+
+  await writeFile(
+    join(rootDir, "index.html"),
+    '<a href="https://example.com" rel="noopener noreferrer">Extern</a>\n'
+  );
+  const safeResult = runLint(rootDir);
+
+  assert.equal(safeResult.status, 0, safeResult.stderr);
 });
