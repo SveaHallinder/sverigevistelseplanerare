@@ -129,7 +129,7 @@ test("citizenship or ten years in Sweden adds the five-year evidence date", () =
       level: "info",
       scope: "actual",
       title: "Femårsdag för bevisbördeperioden",
-      summary: "Fem år är inte en automatisk skattefri gräns. Väsentlig anknytning kan behöva bedömas även senare.",
+      summary: "Fem år innebär inte automatisk skattskyldighet och är inte en automatisk skattefri gräns. Väsentlig anknytning kan behöva bedömas även senare.",
       evidence: [
         "Utflyttningsdatum 2025-05-10",
         "Femårsdag 2030-05-10"

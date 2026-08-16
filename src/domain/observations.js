@@ -85,7 +85,7 @@ export function buildObservations(profile, stays) {
       id: "five-year-evidence",
       level: "info",
       title: "Femårsdag för bevisbördeperioden",
-      summary: "Fem år är inte en automatisk skattefri gräns. Väsentlig anknytning kan behöva bedömas även senare.",
+      summary: "Fem år innebär inte automatisk skattskyldighet och är inte en automatisk skattefri gräns. Väsentlig anknytning kan behöva bedömas även senare.",
       evidence: [
         "Utflyttningsdatum " + profile.departureDate,
         "Femårsdag " + addYearsClamped(profile.departureDate, 5)
