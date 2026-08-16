@@ -1,5 +1,5 @@
 import { calculateBudget } from "../domain/budget.js";
-import { isIsoDate } from "../domain/dates.js";
+import { addDays, isIsoDate } from "../domain/dates.js";
 import { buildObservations } from "../domain/observations.js";
 import { getPastPlannedStays } from "../domain/stays.js";
 import { LEGAL_SOURCES } from "../legal-content.js";
@@ -25,6 +25,15 @@ const HTML_ENTITIES = {
   '"': "&quot;",
   "'": "&#39;"
 };
+const FALLBACK_WARNING = "Data kan försvinna när sidan stängs";
+const BLOCKING_STORAGE_ISSUES = new Set([
+  "unsupported-version",
+  "invalid-json",
+  "invalid-state",
+  "storage-conflict",
+  "clear-required",
+  "clear-failed"
+]);
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
@@ -51,11 +60,48 @@ function dayWord(count) {
   return count === 1 ? "dag" : "dagar";
 }
 
+function presentStorageIssue(storageIssue) {
+  if (!storageIssue) {
+    return null;
+  }
+  const preciseMessage = String(storageIssue.message ?? "Lagringen kunde inte användas.");
+  const isFallback = storageIssue.code === "session-fallback"
+    || storageIssue.code === "memory-fallback";
+  return {
+    blocking: BLOCKING_STORAGE_ISSUES.has(storageIssue.code),
+    message: isFallback && !preciseMessage.includes(FALLBACK_WARNING)
+      ? FALLBACK_WARNING + ". " + preciseMessage
+      : preciseMessage
+  };
+}
+
+function mergeDates(dates) {
+  const intervals = [];
+  for (const date of dates) {
+    const current = intervals.at(-1);
+    if (current && date === addDays(current.departureDate, 1)) {
+      current.departureDate = date;
+    } else {
+      intervals.push({ arrivalDate: date, departureDate: date });
+    }
+  }
+  return intervals;
+}
+
+function renderDateInterval(interval) {
+  const start = escapeHtml(formatDate(interval.arrivalDate));
+  const end = escapeHtml(formatDate(interval.departureDate));
+  return '<span class="edge-range">' +
+    (interval.arrivalDate === interval.departureDate ? start : start + "–" + end) +
+    "</span>";
+}
+
 export function buildCockpitModel(state, {
   today,
   year = Number(state.profile.periodStart.slice(0, 4)),
   focusedDate = null,
   storageIssue = null,
+  clearRequested = false,
   demo = false
 }) {
   const budget = calculateBudget(state.profile, state.stays);
@@ -76,6 +122,7 @@ export function buildCockpitModel(state, {
     year,
     focusedDate: focus,
     storageIssue,
+    clearRequested,
     demo
   };
 }
@@ -168,9 +215,10 @@ function renderStayList(model) {
 
     const escapedId = escapeHtml(stay.id);
     const pastAction = model.pastPlanned.some((item) => item.id === stay.id)
-      ? '<button class="secondary-button stay-confirm" type="button" ' +
+      ? '<div class="stay-outcome"><p>Genomfördes den här planerade vistelsen?</p>' +
+        '<button class="secondary-button stay-confirm" type="button" ' +
         'data-action="confirm-actual" data-stay-id="' + escapedId + '">' +
-        "Markera som genomförd</button>"
+        "Ja, markera som genomförd</button></div>"
       : "";
 
     return '<li><button class="stay-row stay-row--' + statusKey +
@@ -195,11 +243,15 @@ function renderBudgetStatus(model) {
   const fill = Math.min(100, Math.round(
     (model.budget.uniqueDays / model.profile.budgetDays) * 100
   ));
+  const excludedIntervals = mergeDates(model.budget.excludedDates);
   const excluded = model.budget.excludedDays > 0
-    ? '<p class="budget-status__excluded">' + escapeHtml(
-      model.budget.excludedDays +
-      " registrerade dagar ligger utanför budgetperioden och räknas inte."
-    ) + "</p>"
+    ? '<p class="budget-status__excluded">' +
+      escapeHtml(model.budget.excludedDays === 1
+        ? "1 registrerad dag ligger utanför budgetperioden och räknas inte:"
+        : model.budget.excludedDays +
+          " registrerade dagar ligger utanför budgetperioden och räknas inte:") +
+      ' <span class="edge-ranges">' +
+      excludedIntervals.map(renderDateInterval).join(", ") + "</span>.</p>"
     : "";
 
   return '<section class="budget-status" aria-labelledby="budget-heading">' +
@@ -243,14 +295,25 @@ export function renderCockpit(model) {
   const demoBanner = model.demo
     ? '<div class="demo-banner" role="status">Syntetiskt demoexempel — sparas inte</div>'
     : "";
-  const storageBanner = model.storageIssue
-    ? '<div class="storage-warning" role="status">' +
-      escapeHtml(model.storageIssue.message) + "</div>"
+  const storagePresentation = presentStorageIssue(model.storageIssue);
+  const storageBanner = storagePresentation
+    ? '<div class="storage-warning" role="' +
+      (storagePresentation.blocking ? "alert" : "status") + '">' +
+      escapeHtml(storagePresentation.message) + "</div>"
     : "";
   const footer = model.demo
     ? ""
-    : '<footer class="app-footer"><button class="danger-text" type="button" ' +
-      'data-action="request-clear">Rensa all data</button></footer>';
+    : '<footer class="app-footer">' + (model.clearRequested
+      ? '<section class="inline-confirm" aria-labelledby="clear-heading">' +
+        '<h2 id="clear-heading">Rensa all appdata?</h2>' +
+        "<p>Det innebär att profilen och alla registrerade vistelser tas bort permanent.</p>" +
+        '<div class="inline-confirm__actions">' +
+        '<button class="primary-button" type="button" data-action="confirm-clear">' +
+        "Ja, rensa all data</button>" +
+        '<button class="secondary-button" type="button" data-action="cancel-clear">' +
+        "Avbryt</button></div></section>"
+      : '<button class="danger-text" type="button" data-action="request-clear">' +
+        "Rensa all data</button>") + "</footer>";
 
   return '<div class="cockpit-shell">' + demoBanner + storageBanner +
     renderHeader(model) + '<div class="cockpit-content">' + renderSummary(model) +

@@ -8,9 +8,48 @@ const HTML_ENTITIES = {
   '"': "&quot;",
   "'": "&#39;"
 };
+const FALLBACK_WARNING = "Data kan försvinna när sidan stängs";
+const BLOCKING_STORAGE_ISSUES = new Set([
+  "unsupported-version",
+  "invalid-json",
+  "invalid-state",
+  "storage-conflict",
+  "clear-required",
+  "clear-failed"
+]);
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
+}
+
+function presentStorageIssue(storageIssue) {
+  if (!storageIssue) {
+    return null;
+  }
+  const preciseMessage = String(storageIssue.message ?? "Lagringen kunde inte användas.");
+  const isFallback = storageIssue.code === "session-fallback"
+    || storageIssue.code === "memory-fallback";
+  return {
+    blocking: BLOCKING_STORAGE_ISSUES.has(storageIssue.code),
+    message: isFallback && !preciseMessage.includes(FALLBACK_WARNING)
+      ? FALLBACK_WARNING + ". " + preciseMessage
+      : preciseMessage
+  };
+}
+
+function renderClearControl(clearRequested) {
+  if (!clearRequested) {
+    return '<button class="danger-text" type="button" data-action="request-clear">' +
+      "Rensa inkompatibel appdata</button>";
+  }
+  return '<section class="inline-confirm" aria-labelledby="clear-heading">' +
+    '<h2 id="clear-heading">Rensa all appdata?</h2>' +
+    "<p>Det innebär att profilen och alla registrerade vistelser tas bort permanent.</p>" +
+    '<div class="inline-confirm__actions">' +
+    '<button class="primary-button" type="button" data-action="confirm-clear">' +
+    "Ja, rensa all data</button>" +
+    '<button class="secondary-button" type="button" data-action="cancel-clear">' +
+    "Avbryt</button></div></section>";
 }
 
 function errorFor(errors, key) {
@@ -51,6 +90,7 @@ export function renderOnboarding({
   fieldErrors = {},
   storageIssue = null,
   editing = false,
+  clearRequested = false,
   defaultYear
 }) {
   const defaults = profile ?? {
@@ -67,9 +107,15 @@ export function renderOnboarding({
     ? '<div class="error-summary" role="alert"><h2>Kontrollera uppgifterna</h2><p>' +
       errors.map(escapeHtml).join(" ") + "</p></div>"
     : "";
-  const storageBanner = storageIssue
-    ? '<p class="storage-warning" role="status">' +
-      escapeHtml(storageIssue.message) + "</p>"
+  const storagePresentation = presentStorageIssue(storageIssue);
+  const storageBanner = storagePresentation
+    ? '<p class="storage-warning" role="' +
+      (storagePresentation.blocking ? "alert" : "status") +
+      '" id="storage-issue">' +
+      escapeHtml(storagePresentation.message) + "</p>"
+    : "";
+  const storageClear = storagePresentation?.blocking
+    ? renderClearControl(clearRequested)
     : "";
   const checklist = CHECKLIST_KEYS.map((key) => triStateFieldset({
     name: "connectionChecklist." + key,
@@ -85,7 +131,7 @@ export function renderOnboarding({
     "</h1>" +
     '<p class="disclaimer">Planeringsverktyg, inte juridisk rådgivning. ' +
     "Ett grönt budgetläge är inte ett juridiskt besked.</p></header>" +
-    '<div class="onboarding-body">' + storageBanner + errorSummary +
+    '<div class="onboarding-body">' + storageBanner + storageClear + errorSummary +
     '<form data-form="profile" novalidate>' +
     '<div class="field"><label for="departureDate">Utflyttningsdatum</label>' +
     '<input id="departureDate" name="departureDate" type="date" value="' +
@@ -121,7 +167,10 @@ export function renderOnboarding({
       value: defaults.livedInSwedenTenYears,
       errors: fieldErrors
     }) + checklist + "</details>" +
-    '<div class="form-actions"><button class="primary-button" type="submit">' +
+    '<div class="form-actions"><button class="primary-button" type="submit"' +
+    (storagePresentation?.blocking
+      ? ' disabled aria-describedby="storage-issue"'
+      : "") + ">" +
     (editing ? "Spara ändringar" : "Skapa min plan") + "</button>" +
     (editing
       ? '<button class="secondary-button" type="button" data-action="cancel-edit-profile">Avbryt</button>'

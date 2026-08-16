@@ -92,8 +92,46 @@ test("renderOnboarding shows a storage warning without adding travel dates to it
   });
   const banner = html.match(/<p class="storage-warning"[^>]*>(.*?)<\/p>/)?.[1];
 
-  assert.equal(banner, "Data försvinner när sidan laddas om.");
+  assert.match(banner, /Data kan försvinna när sidan stängs/);
+  assert.match(banner, /Data försvinner när sidan laddas om/);
   assert.doesNotMatch(banner, /\d{4}-\d{2}-\d{2}/);
+});
+
+test("renderOnboarding presents unsupported storage as a blocking clear flow", () => {
+  const issue = {
+    code: "unsupported-version",
+    message: "Den sparade dataversionen stöds inte. Datan har inte skrivits över."
+  };
+  const initial = render({ storageIssue: issue });
+  const requested = render({ storageIssue: issue, clearRequested: true });
+
+  assert.match(initial, /class="storage-warning" role="alert"/);
+  assert.match(initial, /data-action="request-clear"/);
+  assert.match(initial, /type="submit"[^>]*disabled/);
+  assert.match(requested, /profilen och alla registrerade vistelser tas bort/);
+  assert.match(requested, /data-action="confirm-clear"/);
+  assert.match(requested, /data-action="cancel-clear"/);
+});
+
+test("session and memory presentation keeps the shared closing warning and precise detail", () => {
+  const sessionHtml = render({
+    storageIssue: {
+      code: "session-fallback",
+      message: "Sessionslagring används för den här fliken."
+    }
+  });
+  const memoryHtml = render({
+    storageIssue: {
+      code: "memory-fallback",
+      message: "Data försvinner när sidan laddas om."
+    }
+  });
+
+  for (const html of [sessionHtml, memoryHtml]) {
+    assert.match(html, /Data kan försvinna när sidan stängs/);
+  }
+  assert.match(sessionHtml, /Sessionslagring används för den här fliken/);
+  assert.match(memoryHtml, /Data försvinner när sidan laddas om/);
 });
 
 test("renderOnboarding uses editing actions without exposing the demo action", () => {
@@ -347,16 +385,26 @@ test("renderCockpit offers confirmation for a past planned stay", () => {
 
   assert.match(html, /data-action="confirm-actual" data-stay-id="planned-august"/);
   assert.match(html, /class="stay-row stay-row--planned"[^>]*data-action="edit-stay"/);
-  assert.match(html, /Markera som genomförd/);
+  assert.match(html, /Genomfördes den här planerade vistelsen\?/);
+  assert.match(html, /Ja, markera som genomförd/);
+  assert.equal(cockpitState().stays[1].status, "planned");
 });
 
-test("renderCockpit reports excluded dates neutrally", () => {
+test("renderCockpit reports merged excluded date ranges neutrally", () => {
   requireCockpitApi();
   const state = cockpitState({
     profile: {
       periodStart: "2026-08-02",
-      periodEnd: "2026-08-05"
-    }
+      periodEnd: "2026-08-04"
+    },
+    stays: [{
+      id: "partly-excluded",
+      arrivalDate: "2026-07-30",
+      departureDate: "2026-08-06",
+      status: "actual",
+      createdAt: "2026-07-29T12:00:00.000Z",
+      updatedAt: "2026-07-29T12:00:00.000Z"
+    }]
   });
   const html = renderCockpit(buildCockpitModel(state, {
     today: "2026-08-16",
@@ -365,9 +413,31 @@ test("renderCockpit reports excluded dates neutrally", () => {
 
   assert.match(
     html,
-    /class="budget-status__excluded">2 registrerade dagar ligger utanför budgetperioden och räknas inte\./
+    /class="budget-status__excluded">5 registrerade dagar ligger utanför budgetperioden och räknas inte:/
   );
+  assert.match(html, /class="edge-range">30 juli 2026–1 augusti 2026<\/span>/);
+  assert.match(html, /class="edge-range">5 augusti 2026–6 augusti 2026<\/span>/);
   assert.doesNotMatch(html, /budget-status__excluded[^>]*validation|budget-status__excluded[^>]*danger/);
+});
+
+test("renderCockpit uses an inline clear confirmation and fallback warning copy", () => {
+  requireCockpitApi();
+  const model = buildCockpitModel(cockpitState(), {
+    today: "2026-08-16",
+    year: 2026,
+    clearRequested: true,
+    storageIssue: {
+      code: "memory-fallback",
+      message: "Data försvinner när sidan laddas om."
+    }
+  });
+  const html = renderCockpit(model);
+
+  assert.match(html, /Data kan försvinna när sidan stängs/);
+  assert.match(html, /Data försvinner när sidan laddas om/);
+  assert.match(html, /profilen och alla registrerade vistelser tas bort/);
+  assert.match(html, /data-action="confirm-clear"/);
+  assert.match(html, /data-action="cancel-clear"/);
 });
 
 test("renderCockpit gives every legal observation evidence, source and review date", () => {
@@ -455,6 +525,8 @@ test("cockpit CSS keeps calendar responsive and status markers non-colour-only",
   );
   assert.match(css, /\.stay-row--planned/);
   assert.match(css, /\.observation a\s*\{[^}]*min-height:\s*2\.75rem/s);
+  assert.match(css, /\.inline-confirm\s*\{/);
+  assert.match(css, /\.edge-ranges\s*\{/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)/);
 });
 
@@ -686,23 +758,33 @@ function fakeBrowserDocument() {
   };
 }
 
-function browserRepository(initialState) {
+function browserRepository(initialState, {
+  loadIssue = null,
+  saveResult = null,
+  clearResult = null
+} = {}) {
   let state = initialState;
   const calls = { save: [], clear: 0 };
   return {
     calls,
     load() {
-      return { state, issue: null, mode: "local" };
+      return { state, issue: loadIssue, mode: "local" };
     },
     save(nextState) {
       calls.save.push(nextState);
+      if (saveResult && !saveResult.ok) {
+        return saveResult;
+      }
       state = nextState;
-      return { ok: true, issue: null, mode: "local" };
+      return saveResult ?? { ok: true, issue: null, mode: "local" };
     },
     clear() {
       calls.clear += 1;
+      if (clearResult && !clearResult.ok) {
+        return clearResult;
+      }
       state = null;
-      return { ok: true, issue: null, mode: "local" };
+      return clearResult ?? { ok: true, issue: null, mode: "local" };
     }
   };
 }
@@ -737,13 +819,21 @@ function stayForm(fields) {
   };
 }
 
-function createTestBrowserApp(state = cockpitState()) {
+function profileForm(fields) {
+  return {
+    fields,
+    matches(selector) {
+      return selector === '[data-form="profile"]';
+    }
+  };
+}
+
+function createTestBrowserApp(state = cockpitState(), repositoryOptions = {}) {
   assert.equal(typeof createBrowserApp, "function", "createBrowserApp ska exporteras");
   const browser = fakeBrowserDocument();
-  const repository = browserRepository(state);
+  const repository = browserRepository(state, repositoryOptions);
   const windowRef = {
-    crypto: { randomUUID: () => "browser-stay" },
-    confirm: () => true
+    crypto: { randomUUID: () => "browser-stay" }
   };
   const api = createBrowserApp({
     documentRef: browser.documentRef,
@@ -760,6 +850,48 @@ test("main can be imported without browser globals and renders the loaded cockpi
   const { app, api } = createTestBrowserApp();
 
   assert.equal(typeof api.controller.getSnapshot, "function");
+  assert.match(app.innerHTML, /Din Sverigeöversikt/);
+});
+
+test("main keeps past planned stays planned until explicit outcome confirmation", () => {
+  const { app, repository, api } = createTestBrowserApp();
+
+  assert.match(app.innerHTML, /Genomfördes den här planerade vistelsen\?/);
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(
+    api.controller.getSnapshot().state.stays.find((stay) => stay.id === "planned-august").status,
+    "planned"
+  );
+
+  app.dispatch("click", {
+    target: actionTarget("confirm-actual", { stayId: "planned-august" })
+  });
+  assert.equal(repository.calls.save.length, 1);
+  assert.equal(
+    api.controller.getSnapshot().state.stays.find((stay) => stay.id === "planned-august").status,
+    "actual"
+  );
+});
+
+test("main profile editing retains stays", () => {
+  const initial = cockpitState();
+  const { app, repository } = createTestBrowserApp(initial);
+  app.dispatch("click", { target: actionTarget("edit-profile") });
+  assert.match(app.innerHTML, /data-form="profile"/);
+
+  withFormData(() => app.dispatch("submit", {
+    target: profileForm({
+      departureDate: "2025-02-15",
+      budgetDays: "7",
+      periodStart: "2026-01-01",
+      periodEnd: "2026-12-31"
+    }),
+    preventDefault() {}
+  }));
+
+  assert.equal(repository.calls.save.length, 1);
+  assert.deepEqual(repository.calls.save[0].stays, initial.stays);
+  assert.equal(repository.calls.save[0].profile.budgetDays, 7);
   assert.match(app.innerHTML, /Din Sverigeöversikt/);
 });
 
@@ -882,17 +1014,60 @@ test("main closes native dialog cancellation and restores opener focus", () => {
   assert.equal(focusCount, 1);
 });
 
-test("main only clears all data after the browser confirmation", () => {
-  const { app, repository, windowRef } = createTestBrowserApp();
-  windowRef.confirm = () => false;
-
+test("main clears only after inline confirmation and cancel leaves state untouched", () => {
+  const { app, repository, api } = createTestBrowserApp();
+  const initial = api.controller.getSnapshot().state;
   app.dispatch("click", { target: actionTarget("request-clear") });
   assert.equal(repository.calls.clear, 0);
+  assert.match(app.innerHTML, /profilen och alla registrerade vistelser tas bort/);
+  assert.match(app.innerHTML, /data-action="confirm-clear"/);
 
-  windowRef.confirm = () => true;
+  app.dispatch("click", { target: actionTarget("cancel-clear") });
+  assert.equal(repository.calls.clear, 0);
+  assert.equal(api.controller.getSnapshot().state, initial);
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-clear"/);
+
   app.dispatch("click", { target: actionTarget("request-clear") });
+  app.dispatch("click", { target: actionTarget("confirm-clear") });
   assert.equal(repository.calls.clear, 1);
   assert.match(app.innerHTML, /Planera Sverigedagar/);
+});
+
+test("main blocks unsupported storage saves and keeps failed clear retry visible", () => {
+  const unsupported = {
+    code: "unsupported-version",
+    message: "Den sparade dataversionen stöds inte. Datan har inte skrivits över."
+  };
+  const clearFailure = {
+    ok: false,
+    issue: { code: "clear-failed", message: "All appdata kunde inte rensas." },
+    mode: "local"
+  };
+  const { app, repository } = createTestBrowserApp(null, {
+    loadIssue: unsupported,
+    clearResult: clearFailure
+  });
+
+  assert.match(app.innerHTML, /class="storage-warning" role="alert"/);
+  assert.match(app.innerHTML, /data-action="request-clear"/);
+  withFormData(() => app.dispatch("submit", {
+    target: profileForm({
+      departureDate: "2025-02-15",
+      budgetDays: "90",
+      periodStart: "2026-01-01",
+      periodEnd: "2026-12-31"
+    }),
+    preventDefault() {}
+  }));
+  assert.equal(repository.calls.save.length, 0);
+
+  app.dispatch("click", { target: actionTarget("request-clear") });
+  app.dispatch("click", { target: actionTarget("confirm-clear") });
+
+  assert.equal(repository.calls.clear, 1);
+  assert.match(app.innerHTML, /All appdata kunde inte rensas/);
+  assert.match(app.innerHTML, /data-action="confirm-clear"/);
+  assert.match(app.innerHTML, /data-action="cancel-clear"/);
 });
 
 test("main moves roving calendar focus across year boundaries and opens with Enter", () => {

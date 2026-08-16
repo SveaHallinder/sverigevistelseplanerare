@@ -34,16 +34,6 @@ function createIdFactory(windowRef) {
   };
 }
 
-function safeConfirmed(windowRef, message) {
-  try {
-    return typeof windowRef?.confirm === "function"
-      ? windowRef.confirm(message)
-      : false;
-  } catch {
-    return false;
-  }
-}
-
 function yearFromDate(date) {
   return Number(date.slice(0, 4));
 }
@@ -69,6 +59,7 @@ export function createBrowserApp(options = {}) {
   let viewYear = yearFromDate(today);
   let focusedDate = today;
   let currentDialog = null;
+  let clearRequested = false;
 
   function announce(message) {
     if (message) {
@@ -86,6 +77,7 @@ export function createBrowserApp(options = {}) {
         year: viewYear,
         focusedDate,
         storageIssue: published.storageIssue,
+        clearRequested,
         demo: published.demo
       });
       focusedDate = model.focusedDate;
@@ -98,6 +90,7 @@ export function createBrowserApp(options = {}) {
       fieldErrors,
       storageIssue: published.storageIssue,
       editing: published.editingProfile,
+      clearRequested,
       defaultYear: today.slice(0, 4)
     });
   }
@@ -265,12 +258,20 @@ export function createBrowserApp(options = {}) {
     } else if (action === "cancel-edit-profile") {
       controller.cancelEditProfile();
     } else if (action === "request-clear") {
-      const confirmed = safeConfirmed(
-        windowRef,
-        "Rensa profilen och alla registrerade vistelser? Detta kan inte ångras."
-      );
-      if (confirmed) {
-        announce(controller.clearAll({ confirmed: true }).message);
+      clearRequested = true;
+      renderPublished();
+      app.querySelector?.('[data-action="confirm-clear"]')?.focus?.();
+    } else if (action === "cancel-clear") {
+      clearRequested = false;
+      renderPublished();
+      app.querySelector?.('[data-action="request-clear"]')?.focus?.();
+    } else if (action === "confirm-clear") {
+      const cleared = controller.clearAll({ confirmed: true });
+      clearRequested = !cleared.ok;
+      renderPublished();
+      announce(cleared.message);
+      if (!cleared.ok) {
+        app.querySelector?.('[data-action="confirm-clear"]')?.focus?.();
       }
     }
   });

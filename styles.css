@@ -251,6 +251,12 @@ input[aria-invalid="true"] {
   border-left: 0.3rem solid var(--observation-amber);
 }
 
+.storage-warning[role="alert"] {
+  color: #7a1530;
+  background: #fff1f3;
+  border-left-color: var(--validation-red);
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;
@@ -420,6 +426,14 @@ input[aria-invalid="true"] {
 
 .budget-status__excluded {
   font-size: 0.9rem;
+}
+
+.edge-ranges {
+  display: inline;
+}
+
+.edge-range {
+  white-space: nowrap;
 }
 
 .budget-meter {
@@ -718,6 +732,19 @@ button.stay-row:hover {
   width: 100%;
 }
 
+.stay-outcome {
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+}
+
+.stay-outcome p {
+  margin: 0 0 0.6rem;
+  color: var(--ink-muted);
+  font-size: 0.86rem;
+}
+
 .empty-state {
   padding: 1rem;
   background: #fff;
@@ -795,6 +822,35 @@ button.stay-row:hover {
   margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
+}
+
+.inline-confirm {
+  max-width: 38rem;
+  padding: 1rem;
+  background: #fff1f3;
+  border: 1px solid rgba(180, 35, 63, 0.45);
+  border-radius: 0.65rem;
+}
+
+.inline-confirm h2,
+.inline-confirm p {
+  margin: 0;
+}
+
+.inline-confirm h2 {
+  color: #7a1530;
+  font-size: 1.05rem;
+}
+
+.inline-confirm p {
+  margin-top: 0.35rem;
+}
+
+.inline-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
 }
 
 .danger-text {

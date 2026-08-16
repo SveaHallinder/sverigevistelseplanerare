@@ -7,6 +7,15 @@ import {
 } from "./domain/state.js";
 import { createDemoState } from "./demo-state.js";
 
+const BLOCKING_STORAGE_ISSUES = new Set([
+  "unsupported-version",
+  "invalid-json",
+  "invalid-state",
+  "storage-conflict",
+  "clear-required",
+  "clear-failed"
+]);
+
 export function createAppController({
   repository,
   render,
@@ -39,7 +48,15 @@ export function createAppController({
       : result(false, "Avsluta demoexemplet innan du ändrar din plan.");
   }
 
+  function blockedByStorage() {
+    return BLOCKING_STORAGE_ISSUES.has(storageIssue?.code)
+      ? result(false, storageIssue.message)
+      : null;
+  }
+
   function persist(nextState, message) {
+    const blocked = blockedByStorage();
+    if (blocked) return blocked;
     const saved = repository.save(nextState);
     storageIssue = saved.issue;
     if (!saved.ok) {
@@ -158,6 +175,11 @@ export function createAppController({
     }
     const cleared = repository.clear();
     if (!cleared.ok) {
+      storageIssue = cleared.issue ?? {
+        code: "clear-failed",
+        message: "Datan kunde inte rensas."
+      };
+      publish();
       return result(false, cleared.issue?.message ?? "Datan kunde inte rensas.");
     }
     state = null;

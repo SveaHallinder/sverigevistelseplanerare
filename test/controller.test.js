@@ -261,6 +261,44 @@ test("storage issue remains visible through profile edit rerenders", () => {
   assert.deepEqual(renders.at(-1).storageIssue, storageIssue);
 });
 
+test("editing a profile preserves every existing stay", () => {
+  const existingStays = [
+    stay("actual", { status: "actual" }),
+    stay("planned", { arrivalDate: "2026-09-01", departureDate: "2026-09-03" })
+  ];
+  const repository = fakeRepository({ state: appState({ stays: existingStays }) });
+  const { controller } = setup({ repository });
+  controller.init();
+  controller.beginEditProfile();
+
+  const saved = controller.saveProfile(profile({ budgetDays: 75 }));
+
+  assert.equal(saved.ok, true);
+  assert.deepEqual(repository.calls.save[0].stays, existingStays);
+  assert.deepEqual(controller.getSnapshot().state.stays, existingStays);
+  assert.equal(controller.getSnapshot().editingProfile, false);
+});
+
+test("an unsupported stored version blocks profile saves until a successful clear", () => {
+  const unsupported = {
+    code: "unsupported-version",
+    message: "Den sparade dataversionen stöds inte. Datan har inte skrivits över."
+  };
+  const repository = fakeRepository({ loadIssue: unsupported });
+  const { controller } = setup({ repository });
+  controller.init();
+
+  const blocked = controller.saveProfile(profile());
+
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.message, /dataversionen stöds inte/);
+  assert.equal(repository.calls.save.length, 0);
+
+  assert.equal(controller.clearAll({ confirmed: true }).ok, true);
+  assert.equal(controller.saveProfile(profile()).ok, true);
+  assert.equal(repository.calls.save.length, 1);
+});
+
 test("confirmPastPlanned changes only the selected stay to actual", () => {
   const first = stay("first", { departureDate: "2026-07-05" });
   const second = stay("second", {
@@ -384,11 +422,19 @@ test("a failed clear preserves the loaded state", () => {
       mode: "local"
     }
   });
-  const { controller } = setup({ repository });
+  const { controller, renders } = setup({ repository });
   controller.init();
 
   const result = controller.clearAll({ confirmed: true });
 
   assert.equal(result.ok, false);
   assert.equal(controller.getSnapshot().state, initial);
+  assert.deepEqual(controller.getSnapshot().storageIssue, {
+    code: "clear-failed",
+    message: "All appdata kunde inte rensas."
+  });
+  assert.deepEqual(renders.at(-1).storageIssue, {
+    code: "clear-failed",
+    message: "All appdata kunde inte rensas."
+  });
 });
