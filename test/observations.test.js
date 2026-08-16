@@ -129,7 +129,7 @@ test("citizenship or ten years in Sweden adds the five-year evidence date", () =
       level: "info",
       scope: "actual",
       title: "Femårsdag för bevisbördeperioden",
-      summary: "Kräver individuell bedömning.",
+      summary: "Fem år är inte en automatisk skattefri gräns. Väsentlig anknytning kan behöva bedömas även senare.",
       evidence: [
         "Utflyttningsdatum 2025-05-10",
         "Femårsdag 2030-05-10"
@@ -297,7 +297,50 @@ test("combined facts do not duplicate an exact actual pattern fact", () => {
   assert.equal(matchingFacts[0].scope, "actual");
 });
 
-test("work observation compares actual and combined rolling counts", () => {
+test("a separate planned gap survives matching actual gap lengths", () => {
+  const observations = buildObservations(profile(), [
+    {
+      arrivalDate: "2026-01-01",
+      departureDate: "2026-01-10",
+      status: "actual"
+    },
+    {
+      arrivalDate: "2026-01-16",
+      departureDate: "2026-01-25",
+      status: "actual"
+    },
+    {
+      arrivalDate: "2026-03-01",
+      departureDate: "2026-03-10",
+      status: "planned"
+    },
+    {
+      arrivalDate: "2026-03-16",
+      departureDate: "2026-03-25",
+      status: "planned"
+    }
+  ]);
+  const gapRows = observations.filter((row) =>
+    row.title === "Möjligt tillfälligt avbrott");
+
+  assert.deepEqual(gapRows.map((row) => ({
+    id: row.id,
+    scope: row.scope
+  })), [
+    {
+      id: "temporary-gap-actual-2026-01-11",
+      scope: "actual"
+    },
+    {
+      id: "temporary-gap-scenario-2026-03-11",
+      scope: "scenario"
+    }
+  ]);
+  assert.equal(gapRows[1].summary.startsWith("Om planen genomförs: "), true);
+  assert.deepEqual(gapRows[0].evidence, gapRows[1].evidence);
+});
+
+test("work observation becomes a scenario when planned stays are present", () => {
   const observations = buildObservations(profile({
     connectionChecklist: { workDuringStays: "yes" }
   }), [
@@ -318,9 +361,9 @@ test("work observation compares actual and combined rolling counts", () => {
     {
       id: "work-rolling-window",
       level: "info",
-      scope: "actual",
+      scope: "scenario",
       title: "Arbete under Sverigebesök",
-      summary: "183 dagar är inte en generell safe harbour och övriga villkor måste bedömas.",
+      summary: "Om planen genomförs: 183 dagar är inte en generell safe harbour och övriga villkor måste bedömas.",
       evidence: [
         "Faktisk historik: högst 2 registrerade dagar i ett tolvmånadersfönster",
         "Faktisk plus planerad: högst 5 registrerade dagar i ett tolvmånadersfönster"
@@ -329,6 +372,27 @@ test("work observation compares actual and combined rolling counts", () => {
       reviewedAt: "2026-08-16"
     }
   );
+});
+
+test("work observation stays actual without planned stays", () => {
+  const observations = buildObservations(profile({
+    connectionChecklist: { workDuringStays: "yes" }
+  }), [{
+    arrivalDate: "2026-01-01",
+    departureDate: "2026-01-02",
+    status: "actual"
+  }]);
+  const work = observations.find((row) => row.id === "work-rolling-window");
+
+  assert.equal(work.scope, "actual");
+  assert.equal(
+    work.summary,
+    "183 dagar är inte en generell safe harbour och övriga villkor måste bedömas."
+  );
+  assert.deepEqual(work.evidence, [
+    "Faktisk historik: högst 2 registrerade dagar i ett tolvmånadersfönster",
+    "Faktisk plus planerad: högst 2 registrerade dagar i ett tolvmånadersfönster"
+  ]);
 });
 
 test("every observation has evidence and matching reviewed source metadata", () => {

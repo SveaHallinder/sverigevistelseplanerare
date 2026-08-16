@@ -59,8 +59,14 @@ function patternObservations(facts, scope) {
   return observations;
 }
 
+function patternFactKey(observation) {
+  return observation.id.replace(/-(actual|scenario)-/, "-")
+    + "|" + observation.evidence.join("|");
+}
+
 export function buildObservations(profile, stays) {
   const actualStays = stays.filter((stay) => stay.status === "actual");
+  const hasPlannedStays = stays.some((stay) => stay.status === "planned");
   const actualFacts = calculatePatternFacts(actualStays);
   const combinedFacts = calculatePatternFacts(stays);
   const observations = [];
@@ -79,6 +85,7 @@ export function buildObservations(profile, stays) {
       id: "five-year-evidence",
       level: "info",
       title: "Femårsdag för bevisbördeperioden",
+      summary: "Fem år är inte en automatisk skattefri gräns. Väsentlig anknytning kan behöva bedömas även senare.",
       evidence: [
         "Utflyttningsdatum " + profile.departureDate,
         "Femårsdag " + addYearsClamped(profile.departureDate, 5)
@@ -104,17 +111,18 @@ export function buildObservations(profile, stays) {
   const actualPatternRows = patternObservations(actualFacts, "actual");
   observations.push(...actualPatternRows);
 
-  const actualPatternKeys = new Set(actualPatternRows.map((row) =>
-    row.title + "|" + row.evidence.join("|")));
+  const actualPatternKeys = new Set(actualPatternRows.map(patternFactKey));
   observations.push(...patternObservations(combinedFacts, "scenario").filter((row) =>
-    !actualPatternKeys.has(row.title + "|" + row.evidence.join("|"))));
+    !actualPatternKeys.has(patternFactKey(row))));
 
   if (profile.connectionChecklist.workDuringStays === "yes") {
     observations.push(createObservation({
       id: "work-rolling-window",
       level: "info",
+      scope: hasPlannedStays ? "scenario" : "actual",
       title: "Arbete under Sverigebesök",
-      summary: "183 dagar är inte en generell safe harbour och övriga villkor måste bedömas.",
+      summary: (hasPlannedStays ? "Om planen genomförs: " : "")
+        + "183 dagar är inte en generell safe harbour och övriga villkor måste bedömas.",
       evidence: [
         "Faktisk historik: högst " + actualFacts.maxRollingTwelveMonths.count
           + " registrerade dagar i ett tolvmånadersfönster",
