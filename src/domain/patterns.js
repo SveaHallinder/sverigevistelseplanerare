@@ -18,7 +18,10 @@ export function getPossibleTemporaryBreaks(mergedIntervals) {
     const beforeDays = daysInclusive(before.arrivalDate, before.departureDate);
     const afterDays = daysInclusive(after.arrivalDate, after.departureDate);
 
-    if (gapDays <= beforeDays && gapDays <= afterDays) {
+    const sixMonthDate = addMonthsClamped(gapStart, 6);
+    const matchesNeighbouringStay = gapDays <= beforeDays || gapDays <= afterDays;
+
+    if (gapEnd < sixMonthDate && matchesNeighbouringStay) {
       observations.push({
         before,
         after,
@@ -46,12 +49,18 @@ export function getSixMonthStays(mergedIntervals) {
 export function maxRollingTwelveMonthDays(stays) {
   const dates = [...getStayDaySets(stays).uniqueDates].sort();
   let best = { count: 0, windowStart: null, windowEnd: null };
+  let windowEndIndex = 0;
 
-  for (const windowStart of dates) {
+  for (let windowStartIndex = 0; windowStartIndex < dates.length; windowStartIndex += 1) {
+    const windowStart = dates[windowStartIndex];
     const windowEnd = rollingYearEnd(windowStart);
-    const count = dates
-      .filter((date) => date >= windowStart && date <= windowEnd)
-      .length;
+    while (
+      windowEndIndex < dates.length
+      && dates[windowEndIndex] <= windowEnd
+    ) {
+      windowEndIndex += 1;
+    }
+    const count = windowEndIndex - windowStartIndex;
 
     if (count > best.count) {
       best = { count, windowStart, windowEnd };

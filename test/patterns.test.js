@@ -42,6 +42,33 @@ test("getPossibleTemporaryBreaks reports a gap no longer than either stay", () =
   assert.deepEqual(intervals, before);
 });
 
+test("getPossibleTemporaryBreaks compares the gap with either neighbouring stay", () => {
+  const shorterThanPrevious = [
+    { arrivalDate: "2026-01-01", departureDate: "2026-01-30" },
+    { arrivalDate: "2026-02-20", departureDate: "2026-03-01" }
+  ];
+  const shorterThanFollowing = [
+    { arrivalDate: "2026-01-01", departureDate: "2026-01-10" },
+    { arrivalDate: "2026-01-31", departureDate: "2026-03-01" }
+  ];
+
+  assert.equal(getPossibleTemporaryBreaks(shorterThanPrevious).length, 1);
+  assert.equal(getPossibleTemporaryBreaks(shorterThanFollowing).length, 1);
+});
+
+test("getPossibleTemporaryBreaks excludes a gap that reaches six months", () => {
+  const before = { arrivalDate: "2025-01-01", departureDate: "2025-12-31" };
+  const after = { arrivalDate: "2026-07-02", departureDate: "2027-07-01" };
+
+  assert.deepEqual(getPossibleTemporaryBreaks([before, after]), []);
+
+  const justUnderSixMonths = {
+    arrivalDate: "2026-07-01",
+    departureDate: "2027-06-30"
+  };
+  assert.equal(getPossibleTemporaryBreaks([before, justUnderSixMonths]).length, 1);
+});
+
 test("getPossibleTemporaryBreaks excludes a gap longer than either stay", () => {
   const intervals = [
     { arrivalDate: "2026-01-01", departureDate: "2026-01-10" },
@@ -111,6 +138,25 @@ test("maxRollingTwelveMonthDays uses inclusive endpoints and the oldest tie", ()
     windowStart: "2025-03-01",
     windowEnd: "2026-02-28"
   });
+});
+
+test("maxRollingTwelveMonthDays stays responsive across decades", () => {
+  const startedAt = performance.now();
+  const result = maxRollingTwelveMonthDays([{
+    arrivalDate: "2000-01-01",
+    departureDate: "2049-12-31",
+    status: "actual"
+  }]);
+
+  assert.deepEqual(result, {
+    count: 366,
+    windowStart: "2000-01-01",
+    windowEnd: "2000-12-31"
+  });
+  assert.ok(
+    performance.now() - startedAt < 1_000,
+    "Femtio års datum ska analyseras på under en sekund."
+  );
 });
 
 test("calculatePatternFacts exposes starts and gaps without classification", () => {
