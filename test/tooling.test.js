@@ -49,6 +49,34 @@ test("build rejects output directories that contain the source root", async (con
   );
 });
 
+test("build rejects symlinked output paths that resolve into source files", async (context) => {
+  const parentDir = await mkdtemp(join(tmpdir(), "sv-plan-build-symlink-"));
+  const rootDir = join(parentDir, "source");
+  const aliasDir = join(parentDir, "source-alias");
+  const sourceScript = join(rootDir, "src", "main.js");
+  context.after(() => rm(parentDir, { recursive: true, force: true }));
+  await mkdir(join(rootDir, "src"), { recursive: true });
+  await writeFile(join(rootDir, "index.html"), "<main>keep me</main>");
+  await writeFile(join(rootDir, "styles.css"), "body{}");
+  await writeFile(sourceScript, "export const untouched = true;");
+
+  try {
+    await symlink(rootDir, aliasDir, "dir");
+  } catch (error) {
+    if (["EACCES", "ENOSYS", "EPERM"].includes(error?.code)) {
+      context.skip("Symlänkar stöds inte på plattformen: " + error.code);
+      return;
+    }
+    throw error;
+  }
+
+  await assert.rejects(
+    build({ rootDir, outDir: join(aliasDir, "src") }),
+    { message: "[sverigevistelseplanerare build] Osäkert mål för build." }
+  );
+  assert.equal(await readFile(sourceScript, "utf8"), "export const untouched = true;");
+});
+
 test("server serves index and rejects dotfiles", async (context) => {
   const rootDir = await mkdtemp(join(tmpdir(), "sv-plan-serve-"));
   context.after(() => rm(rootDir, { recursive: true, force: true }));

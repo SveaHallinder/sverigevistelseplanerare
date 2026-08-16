@@ -1,28 +1,58 @@
-import { cp, mkdir, rm } from "node:fs/promises";
-import { dirname, join, parse, resolve, sep } from "node:path";
+import { cp, mkdir, realpath, rm } from "node:fs/promises";
+import { basename, dirname, join, parse, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
 
+async function canonicalizePath(targetPath) {
+  let existingPath = targetPath;
+  const remainingParts = [];
+
+  while (true) {
+    try {
+      return resolve(await realpath(existingPath), ...remainingParts);
+    } catch (error) {
+      if (!["ENOENT", "ENOTDIR"].includes(error?.code)) {
+        throw error;
+      }
+
+      const nextParent = dirname(existingPath);
+      if (nextParent === existingPath) {
+        throw error;
+      }
+      remainingParts.unshift(basename(existingPath));
+      existingPath = nextParent;
+    }
+  }
+}
+
+function pathsOverlap(firstPath, secondPath) {
+  return firstPath === secondPath ||
+    firstPath.startsWith(secondPath + sep) ||
+    secondPath.startsWith(firstPath + sep);
+}
+
 export async function build({
   rootDir = repoRoot,
   outDir = join(repoRoot, "dist")
 } = {}) {
-  const sourceRoot = resolve(rootDir);
+  const sourceRoot = await realpath(resolve(rootDir));
   const outputRoot = resolve(outDir);
-  const sourcePaths = [
+  const sourcePaths = await Promise.all([
     join(sourceRoot, "index.html"),
     join(sourceRoot, "styles.css"),
     join(sourceRoot, "src")
-  ];
+  ].map(canonicalizePath));
+  const canonicalOutputRoot = await canonicalizePath(outputRoot);
+  const outputContainsSourceRoot = sourceRoot === canonicalOutputRoot ||
+    sourceRoot.startsWith(canonicalOutputRoot + sep);
   const overlapsSource = sourcePaths.some((sourcePath) =>
-    sourcePath === outputRoot ||
-    sourcePath.startsWith(outputRoot + sep) ||
-    outputRoot.startsWith(sourcePath + sep)
+    pathsOverlap(sourcePath, canonicalOutputRoot)
   );
 
-  if (outputRoot === sourceRoot || outputRoot === parse(outputRoot).root || overlapsSource) {
+  if (canonicalOutputRoot === parse(canonicalOutputRoot).root ||
+      outputContainsSourceRoot || overlapsSource) {
     throw new Error("[sverigevistelseplanerare build] Osäkert mål för build.");
   }
 
