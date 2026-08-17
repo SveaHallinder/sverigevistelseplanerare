@@ -776,7 +776,7 @@ git commit -m "feat: add local backup and export controls"
 - Modify: `docs/handoff/CURRENT.md`
 - Modify: `docs/superpowers/plans/2026-08-16-local-data-portability.md`
 
-- [ ] **Step 1: Document only shipped behavior**
+- [x] **Step 1: Document only shipped behavior**
 
 After the UI exists, update README with:
 
@@ -786,7 +786,7 @@ Under "Din data" kan användaren ladda ner en lokal JSON-backup, återställa en
 
 Keep the existing legal and local-storage boundary text.
 
-- [ ] **Step 2: Keep localhost QA at seven steps**
+- [x] **Step 2: Keep localhost QA at seven steps**
 
 Add one final step to `docs/qa/localhost.md` that verifies:
 
@@ -798,11 +798,11 @@ Add one final step to `docs/qa/localhost.md` that verifies:
 6. Same restore file can be selected twice.
 7. Keyboard focus and live announcements work; demo has no data controls. A forced post-write storage conflict keeps controller state/preview, warns that persistent data may have changed and enters the blocking recovery flow.
 
-- [ ] **Step 3: Update the current handoff to completed**
+- [x] **Step 3: Update the current handoff to completed**
 
 In `docs/handoff/CURRENT.md`, replace `NEXT_WORK` with a completed summary containing the final commit SHAs, test count and remaining product roadmap: account/cloud later, visual redesign last. Do not claim deployment or legal approval.
 
-- [ ] **Step 4: Run one fresh serial full check**
+- [x] **Step 4: Run one fresh serial full check**
 
 Run:
 
@@ -814,7 +814,7 @@ git status --short
 
 Expected: lint, all tests and build pass; diff check exits 0; status contains only the four intended docs before commit.
 
-- [ ] **Step 5: Run full localhost QA**
+- [x] **Step 5: Run full localhost QA**
 
 Run `npm run dev` and execute every step in `docs/qa/localhost.md` with:
 
@@ -827,7 +827,7 @@ Run `npm run dev` and execute every step in `docs/qa/localhost.md` with:
 
 Record exact pass/fail evidence. Stop at the first product deviation, fix it test-first, rerun targeted tests, then restart the full QA from empty storage.
 
-- [ ] **Step 6: Commit docs and checked plan**
+- [x] **Step 6: Commit docs and checked plan**
 
 Run:
 
@@ -836,7 +836,7 @@ git add README.md docs/qa/localhost.md docs/handoff/CURRENT.md docs/superpowers/
 git commit -m "docs: verify local data portability"
 ```
 
-- [ ] **Step 7: Produce the Codex review handoff**
+- [x] **Step 7: Produce the Codex review handoff**
 
 Run:
 

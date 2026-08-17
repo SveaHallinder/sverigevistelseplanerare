@@ -28,6 +28,8 @@ Data sparas lokalt i den aktuella webbläsaren. Rensa all lokal appdata genom at
 
 Cockpiten visar hur registrerade dagar, överlapp, exkluderade datum och personliga budgetgränser har räknats.
 
+Under "Din data" kan användaren ladda ner en lokal JSON-backup, återställa en validerad backup efter uttrycklig bekräftelse och exportera vistelser som CSV. Filerna skickas inte till en server.
+
 Verktyget fastslår inte skattehemvist eller juridisk säkerhet och ersätter inte individuell juridisk rådgivning. Konto och molnsynk ingår inte i MVP:n.
 
 ## Fortsatt utveckling med Claude
