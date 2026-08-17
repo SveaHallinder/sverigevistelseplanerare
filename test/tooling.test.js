@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -160,6 +168,40 @@ test("index exposes the required Swedish accessible application landmarks", asyn
   assert.match(html, /<[^>]+\bid="live-region"[^>]+\baria-live="polite"[^>]*>/);
   assert.match(html, /<dialog\b[^>]*>/);
   assert.match(html, /<noscript\b[^>]*>/);
+});
+
+test("index loads its assets relatively so subdirectory hosting works", async () => {
+  const html = await readFile(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+
+  assert.doesNotMatch(html, /\b(?:href|src)="\//);
+  assert.match(html, /<link rel="stylesheet" href="styles\.css">/);
+  assert.match(html, /<script type="module" src="src\/main\.js"><\/script>/);
+});
+
+test("index declares its own icon so no favicon request is required", async () => {
+  const html = await readFile(fileURLToPath(new URL("../index.html", import.meta.url)), "utf8");
+
+  assert.match(html, /<link rel="icon"[^>]*href="data:image\/svg\+xml/);
+});
+
+test("every element id in index is referenced by the application source", async () => {
+  const indexUrl = new URL("../index.html", import.meta.url);
+  const html = await readFile(fileURLToPath(indexUrl), "utf8");
+  const sourceDir = fileURLToPath(new URL("../src", import.meta.url));
+  const entries = await readdir(sourceDir, { recursive: true, withFileTypes: true });
+  const sources = await Promise.all(entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .map((entry) => readFile(join(entry.parentPath ?? entry.path, entry.name), "utf8")));
+  const combined = sources.join("\n");
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+
+  assert.ok(ids.length >= 3, "index ska ha id-försedda landmärken");
+  for (const id of ids) {
+    assert.ok(
+      combined.includes("#" + id),
+      "#" + id + " finns i index.html men används inte i src/"
+    );
+  }
 });
 
 test("server rejects symlinks that escape the public root", async (context) => {
