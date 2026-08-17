@@ -66,6 +66,22 @@ test("buildBudgetExplanation composes existing budget and pattern facts", () => 
   assert.deepEqual(stays, before);
 });
 
+test("buildBudgetExplanation exposes no unrendered fields", () => {
+  const result = buildBudgetExplanation(profile, []);
+
+  assert.deepEqual(Object.keys(result).sort(), [
+    "actualPattern",
+    "boundary",
+    "excludedRanges",
+    "hasPlannedStays",
+    "includedRanges",
+    "overlapRanges",
+    "period",
+    "scenarioPattern",
+    "totals"
+  ]);
+});
+
 test("buildBudgetExplanation has stable empty ranges", () => {
   const result = buildBudgetExplanation(profile, []);
 

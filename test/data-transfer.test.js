@@ -131,3 +131,45 @@ test("transfer codecs reject demos and invalid canonical state", () => {
   assert.equal(createBackupJson({ ...state(), demo: true }).ok, false);
   assert.equal(createStayCsv({ version: 1, profile: null, stays: [{}] }).ok, false);
 });
+
+test("every exported CSV cell is a safe date, status or integer", () => {
+  const result = createStayCsv(state({
+    stays: [
+      {
+        id: "=cmd|' /C calc'!A0",
+        arrivalDate: "2026-02-28",
+        departureDate: "2026-03-01",
+        status: "planned",
+        createdAt: "2026-07-01T12:00:00.000Z",
+        updatedAt: "2026-07-01T12:00:00.000Z"
+      },
+      {
+        id: "b",
+        arrivalDate: "2024-02-29",
+        departureDate: "2024-02-29",
+        status: "actual",
+        createdAt: "2026-07-01T12:00:00.000Z",
+        updatedAt: "2026-07-01T12:00:00.000Z"
+      }
+    ]
+  }));
+  const lines = result.value.split("\r\n").filter((line) => line.length > 0);
+
+  assert.equal(lines[0], "ankomstdatum,avresedatum,status,kalenderdagar");
+  assert.equal(lines.length, 3);
+  for (const line of lines.slice(1)) {
+    const cells = line.split(",");
+    assert.equal(cells.length, 4);
+    assert.match(cells[0], /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(cells[1], /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(["faktisk", "planerad"].includes(cells[2]));
+    assert.match(cells[3], /^\d+$/);
+    for (const cell of cells) {
+      assert.doesNotMatch(cell, /^[=+\-@\t\r]/);
+      assert.doesNotMatch(cell, /["\r\n]/);
+    }
+  }
+  assert.doesNotMatch(result.value, /calc|cmd/);
+  assert.equal(lines[1], "2024-02-29,2024-02-29,faktisk,1");
+  assert.equal(lines[2], "2026-02-28,2026-03-01,planerad,2");
+});

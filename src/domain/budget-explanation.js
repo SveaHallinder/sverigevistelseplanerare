@@ -69,11 +69,6 @@ export function buildBudgetExplanation(profile, stays) {
     overlapRanges: rangesFor(overlapDates, () => "overlap"),
     actualPattern: summarizePattern(calculatePatternFacts(actualStays)),
     scenarioPattern: summarizePattern(calculatePatternFacts(stays)),
-    hasPlannedStays: stays.some((stay) => stay.status === "planned"),
-    rules: {
-      inclusiveEndpoints: true,
-      uniqueBudgetDates: true,
-      actualPresentationPrecedence: true
-    }
+    hasPlannedStays: stays.some((stay) => stay.status === "planned")
   };
 }
