@@ -95,6 +95,14 @@ export function createBrowserApp(options = {}) {
     }
   }
 
+  function blockedByPendingRestore() {
+    if (!published?.restorePreview) {
+      return false;
+    }
+    announce("Bekräfta eller avbryt återställningen först.");
+    return true;
+  }
+
   function renderPublished({ profile = undefined, fieldErrors = {} } = {}) {
     if (!published) {
       return;
@@ -185,6 +193,9 @@ export function createBrowserApp(options = {}) {
   }
 
   function openStay({ id = null, values, returnFocusElement }) {
+    if (blockedByPendingRestore()) {
+      return;
+    }
     currentDialog = {
       id,
       values,
@@ -285,9 +296,9 @@ export function createBrowserApp(options = {}) {
     } else if (action === "exit-demo") {
       announce(controller.exitDemo().message);
     } else if (action === "edit-profile") {
-      controller.beginEditProfile();
+      announce(controller.beginEditProfile().message);
     } else if (action === "cancel-edit-profile") {
-      controller.cancelEditProfile();
+      announce(controller.cancelEditProfile().message);
     } else if (action === "request-clear") {
       clearRequested = true;
       renderPublished();

@@ -1219,6 +1219,67 @@ test("main demo has no data controls and keeps data workflows blocked", () => {
   assert.equal(downloads.length, 0);
 });
 
+test("main refuses to open the stay dialog while a restore is pending", async () => {
+  const { app, dialog, liveRegion, repository } = createTestBrowserApp(cockpitState());
+  await chooseRestoreFile(app, restoreFile());
+  const openers = [
+    actionTarget("add-stay"),
+    actionTarget("select-date", { date: "2026-08-20" }),
+    actionTarget("edit-stay", { stayId: "actual-august" })
+  ];
+
+  for (const target of openers) {
+    liveRegion.textContent = "";
+    app.dispatch("click", { target });
+
+    assert.equal(dialog.open, false);
+    assert.equal(
+      liveRegion.textContent,
+      "Bekräfta eller avbryt återställningen först."
+    );
+  }
+
+  liveRegion.textContent = "";
+  app.dispatch("keydown", {
+    key: "Enter",
+    target: actionTarget("select-date", { date: "2026-08-20" }),
+    preventDefault() {}
+  });
+
+  assert.equal(dialog.open, false);
+  assert.equal(
+    liveRegion.textContent,
+    "Bekräfta eller avbryt återställningen först."
+  );
+  assert.equal(repository.calls.save.length, 0);
+  assert.match(app.innerHTML, /data-action="confirm-restore"/);
+});
+
+test("main announces why profile editing is unavailable during a restore", async () => {
+  const { app, liveRegion } = createTestBrowserApp(cockpitState());
+  await chooseRestoreFile(app, restoreFile());
+  liveRegion.textContent = "";
+
+  app.dispatch("click", { target: actionTarget("edit-profile") });
+
+  assert.equal(
+    liveRegion.textContent,
+    "Bekräfta eller avbryt återställningen först."
+  );
+  assert.doesNotMatch(app.innerHTML, /data-form="profile"/);
+});
+
+test("main opens the stay dialog again once the restore is resolved", async () => {
+  const { app, dialog } = createTestBrowserApp(cockpitState());
+  await chooseRestoreFile(app, restoreFile());
+  app.dispatch("click", { target: actionTarget("cancel-restore") });
+
+  app.dispatch("click", { target: actionTarget("add-stay") });
+
+  assert.equal(dialog.open, true);
+  assert.match(dialog.innerHTML, /name="arrivalDate"[^>]*value="2026-08-16"/);
+});
+
 test("main can be imported without browser globals and renders the loaded cockpit", () => {
   const { app, api } = createTestBrowserApp();
 

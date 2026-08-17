@@ -107,6 +107,7 @@ Neither is in scope for the two completed plans. Nothing here is deployed and no
 - Export remains available in local, session and memory modes. Demo blocks export and restore.
 - Import files over 1 MiB are rejected before reading with neutral Swedish copy. This is a local resource guard, not a legal date limit.
 - Use injected file reading and downloading in browser tests. Revoke object URLs and allow selecting the same file again.
+- While a restore preview is pending the controller blocks every mutation, and the browser layer additionally refuses to open the stay dialog or the profile form. Both announce the same reason instead of opening a form that would be refused on submit. The guard sits in `openStay`, so any future dialog entry point inherits it.
 
 ## Known storage limits deliberately not expanded
 
