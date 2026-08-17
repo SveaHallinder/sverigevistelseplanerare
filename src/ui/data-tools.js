@@ -17,11 +17,17 @@ function renderPreview(preview) {
     ? "1 vistelse"
     : preview.stayCount + " vistelser";
   const profile = preview.hasProfile ? "Profil finns" : "Ingen profil";
+  const isEmpty = !preview.hasProfile && preview.stayCount === 0;
+  const emptyWarning = isEmpty
+    ? "<p><strong>Backupfilen är tom.</strong> Din nuvarande profil och alla "
+      + "vistelser tas bort utan att ersättas med något.</p>"
+    : "";
 
   return '<section class="inline-confirm" aria-labelledby="restore-heading">'
     + '<h3 id="restore-heading">Ersätt aktuell data?</h3>'
     + "<p><strong>Fil:</strong> " + escapeHtml(preview.fileName) + "</p>"
     + "<p>" + escapeHtml(profile) + ", " + escapeHtml(stayCount) + ".</p>"
+    + emptyWarning
     + "<p>Den aktuella profilen och alla vistelser ersätts först när du "
     + "bekräftar.</p>"
     + '<div class="inline-confirm__actions">'
@@ -44,8 +50,9 @@ export function renderDataTools({
   return '<section class="aside-card data-tools" '
     + 'aria-labelledby="data-tools-heading">'
     + '<h2 id="data-tools-heading">Din data</h2>'
-    + "<p>Backupen sparas som en lokal JSON-fil. CSV innehåller endast "
-    + "vistelser.</p>"
+    + "<p>Backupen sparas som en lokal JSON-fil och innehåller dina "
+    + "profilsvar i läsbar text. Spara den bara där du själv vill ha den. "
+    + "CSV innehåller endast vistelser.</p>"
     + '<div class="data-tools__actions">'
     + exportActions
     + '<button type="button" class="secondary-button" '

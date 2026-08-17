@@ -1016,6 +1016,30 @@ test("renderDataTools escapes the preview filename and offers explicit actions",
   assert.doesNotMatch(html, /<img|onerror="PRIVATE"/);
 });
 
+test("renderDataTools warns that the JSON backup contains the profile answers", () => {
+  const html = renderDataTools({ canExport: true });
+
+  assert.match(html, /innehåller dina profilsvar/);
+  assert.match(html, /CSV innehåller endast vistelser/);
+  assert.doesNotMatch(html, /krypter/i);
+});
+
+test("renderDataTools calls an empty backup a removal, not just a replacement", () => {
+  const emptyBackup = renderDataTools({
+    canExport: true,
+    restorePreview: { fileName: "tom.json", hasProfile: false, stayCount: 0 }
+  });
+  const fullBackup = renderDataTools({
+    canExport: true,
+    restorePreview: { fileName: "full.json", hasProfile: true, stayCount: 2 }
+  });
+
+  assert.match(emptyBackup, /0 vistelser/);
+  assert.match(emptyBackup, /Backupfilen är tom/);
+  assert.match(emptyBackup, /tas bort utan att ersättas/);
+  assert.doesNotMatch(fullBackup, /Backupfilen är tom/);
+});
+
 test("renderDataTools hides confirmation without a preview and pluralises stays", () => {
   const withoutPreview = renderDataTools({ canExport: true });
   const twoStays = renderDataTools({
