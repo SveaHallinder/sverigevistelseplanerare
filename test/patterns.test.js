@@ -6,6 +6,22 @@ import {
   getSixMonthStays,
   maxRollingTwelveMonthDays
 } from "../src/domain/patterns.js";
+import { TEMPORARY_BREAK_SCENARIOS } from "./fixtures/legal-scenarios.js";
+
+test("official temporary-break scenarios stay source-backed", async (context) => {
+  for (const scenario of TEMPORARY_BREAK_SCENARIOS) {
+    await context.test(scenario.name, () => {
+      const result = getPossibleTemporaryBreaks(scenario.intervals);
+      assert.equal(result.length > 0, scenario.expectedObservation);
+      assert.equal(scenario.sourceId, "permanentStay");
+      assert.equal(
+        scenario.sourceUrl,
+        "https://www4.skatteverket.se/rattsligvagledning/edition/2026.7/2637.html"
+      );
+      assert.equal(scenario.reviewedAt, "2026-08-16");
+    });
+  }
+});
 
 test("getSixMonthStays requires the interval to reach its six-month date", () => {
   assert.deepEqual(getSixMonthStays([{

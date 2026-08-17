@@ -24,7 +24,7 @@
 - Modify: `test/patterns.test.js`
 - Verify: `src/domain/patterns.js`
 
-- [ ] **Step 1: Add the fixture import and table-driven test before the fixture exists**
+- [x] **Step 1: Add the fixture import and table-driven test before the fixture exists**
 
 Add this import to `test/patterns.test.js`:
 
@@ -51,7 +51,7 @@ test("official temporary-break scenarios stay source-backed", async (context) =>
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -61,7 +61,7 @@ node --test test/patterns.test.js
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `test/fixtures/legal-scenarios.js`.
 
-- [ ] **Step 3: Create the frozen source-backed fixtures**
+- [x] **Step 3: Create the frozen source-backed fixtures**
 
 Create `test/fixtures/legal-scenarios.js` with:
 
@@ -113,7 +113,7 @@ export const TEMPORARY_BREAK_SCENARIOS = Object.freeze([
 
 The asymmetric second fixture is the mutation-sensitive proof that the current `||` condition is intentional.
 
-- [ ] **Step 4: Run legal pattern and observation tests and verify GREEN**
+- [x] **Step 4: Run legal pattern and observation tests and verify GREEN**
 
 Run:
 
@@ -123,7 +123,7 @@ node --test test/patterns.test.js test/observations.test.js
 
 Expected: PASS. If it fails, inspect the official source URL stored in the fixture before touching production code. Do not change `||` to `&&`.
 
-- [ ] **Step 5: Commit the source-backed fixtures**
+- [x] **Step 5: Commit the source-backed fixtures**
 
 Run:
 
