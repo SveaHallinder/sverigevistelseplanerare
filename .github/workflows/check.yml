@@ -1,0 +1,22 @@
+name: check
+
+# Kör hela verifieringskedjan: lint, tester och build.
+# Arbetsflödet är inaktivt tills repot får en GitHub-remote.
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm run check

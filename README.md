@@ -22,6 +22,20 @@ npm run check
 
 Kommandot kör lint, automatiska tester och build.
 
+## Publicera
+
+`npm run build` skriver en statisk kopia till `dist/` (endast `index.html`, `styles.css` och `src/`). Inga byggsteg transformerar koden, så `dist/` kan läggas på valfri statisk webbserver.
+
+`index.html` refererar sina resurser relativt, så appen fungerar både på en domänrot och i en underkatalog, till exempel ett projekt-URL på GitHub Pages. Verifierat genom att servera `dist/` som `/min-app/` på en vanlig statisk server.
+
+Förhandsgranska den byggda kopian med `npm run preview`. Observera att `scripts/serve.mjs` är ett medvetet låst utvecklingsverktyg: det servar bara `index.html`, `styles.css` och `src/` från roten och gör ingen katalogindex-uppslagning, så det kan inte användas för att testa underkatalogsscenariot.
+
+## Webbläsarstöd
+
+Testad i Chromium. Koden använder `dialog.showModal()`, `Array.prototype.at`, `String.prototype.replaceAll`, `File.text()` och `Intl.DateTimeFormat` med `timeZone`, vilket ger baslinjen **Safari 15.4+, Firefox 98+ och Chrome 92+**. `crypto.randomUUID` och `showModal` anropas bakom funktionskontroller och har fallback.
+
+Se `docs/qa/localhost.md` för den manuella webbläsarmatrisen som återstår.
+
 ## Data och MVP-gräns
 
 Data sparas lokalt i den aktuella webbläsaren. Rensa all lokal appdata genom att klicka på **Rensa all data** i UI:t och bekräfta rensningen.
