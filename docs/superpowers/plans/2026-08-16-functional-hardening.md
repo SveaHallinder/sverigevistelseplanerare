@@ -729,7 +729,7 @@ git commit -m "feat: show how registered days are calculated"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-16-functional-hardening.md`
 
-- [ ] **Step 1: Extend existing QA step 3 without exceeding seven total steps**
+- [x] **Step 1: Extend existing QA step 3 without exceeding seven total steps**
 
 Update step 3 in `docs/qa/localhost.md` to require:
 
@@ -737,7 +737,7 @@ Update step 3 in `docs/qa/localhost.md` to require:
 Öppna "Så räknas planen". Verifiera inkluderande ankomst/avresa, en överlappande dag, inkluderade/exkluderade intervall, faktisk/scenario-mönsterfakta, "Senaste registrerade dag inom budget: 5 augusti 2026" och "Första registrerade dag över budget: 6 augusti 2026". Ingen text får kalla datumen juridiskt säkra eller säga att användaren måste lämna Sverige.
 ```
 
-- [ ] **Step 2: Add the shipped explanation to README only after it exists**
+- [x] **Step 2: Add the shipped explanation to README only after it exists**
 
 Under `Data och MVP-gräns`, add one factual sentence:
 
@@ -745,7 +745,7 @@ Under `Data och MVP-gräns`, add one factual sentence:
 Cockpiten visar hur registrerade dagar, överlapp, exkluderade datum och personliga budgetgränser har räknats.
 ```
 
-- [ ] **Step 3: Run the complete serial verification**
+- [x] **Step 3: Run the complete serial verification**
 
 Run:
 
@@ -757,11 +757,11 @@ git status --short
 
 Expected: lint, all tests and build pass; diff check exits 0; status contains only the intended phase-1 docs before commit.
 
-- [ ] **Step 4: Run localhost regression QA**
+- [x] **Step 4: Run localhost regression QA**
 
 Run `npm run dev`, execute all steps in `docs/qa/localhost.md`, and record the exact result in the commit handoff. Verify no console errors and no failed requests.
 
-- [ ] **Step 5: Commit phase-1 docs and checked plan**
+- [x] **Step 5: Commit phase-1 docs and checked plan**
 
 Run:
 
