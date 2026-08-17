@@ -885,11 +885,13 @@ button.stay-row:hover {
 }
 
 .inline-confirm h2,
+.inline-confirm h3,
 .inline-confirm p {
   margin: 0;
 }
 
-.inline-confirm h2 {
+.inline-confirm h2,
+.inline-confirm h3 {
   color: #7a1530;
   font-size: 1.05rem;
 }
@@ -902,6 +904,27 @@ button.stay-row:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.data-tools > p {
+  margin: 0 0 0.9rem;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.data-tools__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.data-tools__actions .secondary-button {
+  flex: 1 1 auto;
+  min-height: 2.75rem;
+}
+
+.data-tools .inline-confirm {
   margin-top: 0.9rem;
 }
 

@@ -5,6 +5,7 @@ import { buildObservations } from "../domain/observations.js";
 import { getPastPlannedStays } from "../domain/stays.js";
 import { LEGAL_SOURCES } from "../legal-content.js";
 import { renderBudgetExplanation } from "./budget-explanation.js";
+import { renderDataTools } from "./data-tools.js";
 import { renderObservations } from "./observations.js";
 
 const MONTHS = [
@@ -104,7 +105,8 @@ export function buildCockpitModel(state, {
   focusedDate = null,
   storageIssue = null,
   clearRequested = false,
-  demo = false
+  demo = false,
+  restorePreview = null
 }) {
   const budget = calculateBudget(state.profile, state.stays);
   const firstDateOfYear = iso(year, 1, 1);
@@ -126,7 +128,8 @@ export function buildCockpitModel(state, {
     focusedDate: focus,
     storageIssue,
     clearRequested,
-    demo
+    demo,
+    restorePreview
   };
 }
 
@@ -340,5 +343,12 @@ export function renderCockpit(model) {
     "<h2>Vistelser</h2>" + renderStayList(model) +
     '</section><section class="aside-card"><h2>Juridiska observationer</h2>' +
     renderObservations(model.observations, LEGAL_SOURCES) +
-    "</section></aside></div>" + footer + "</div></div>";
+    "</section>" +
+    (model.demo
+      ? ""
+      : renderDataTools({
+          restorePreview: model.restorePreview,
+          canExport: true
+        })) +
+    "</aside></div>" + footer + "</div></div>";
 }

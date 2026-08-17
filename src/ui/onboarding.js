@@ -1,5 +1,6 @@
 import { CHECKLIST_CONTENT } from "../legal-content.js";
 import { CHECKLIST_KEYS } from "../domain/validation.js";
+import { renderDataTools } from "./data-tools.js";
 
 const HTML_ENTITIES = {
   "&": "&amp;",
@@ -91,7 +92,9 @@ export function renderOnboarding({
   storageIssue = null,
   editing = false,
   clearRequested = false,
-  defaultYear
+  defaultYear,
+  restorePreview = null,
+  canExport = false
 }) {
   const defaults = profile ?? {
     departureDate: "",
@@ -179,6 +182,7 @@ export function renderOnboarding({
     (editing
       ? ""
       : '<button class="text-button" type="button" data-action="show-demo">Visa syntetiskt demoexempel</button>') +
+    renderDataTools({ restorePreview, canExport }) +
     "</div></section>";
 }
 

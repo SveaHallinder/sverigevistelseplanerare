@@ -319,7 +319,7 @@ assert.equal(repository.calls.save.length, 0);
 
 Also assert an empty stay list returns `ok: false`, the exact message `Det finns inga vistelser att exportera.`, and no download.
 
-- [ ] **Step 3: Add failing restore lifecycle tests**
+- [x] **Step 3: Add failing restore lifecycle tests**
 
 Cover all of these in `test/controller.test.js` before production changes:
 
@@ -532,7 +532,7 @@ git commit -m "feat: restore local data with conflict handling"
 - Modify: `styles.css`
 - Modify: `test/ui.test.js`
 
-- [ ] **Step 1: Add failing escaped data-tools markup tests**
+- [x] **Step 1: Add failing escaped data-tools markup tests**
 
 Import the new renderer through the existing safe dynamic-import pattern in `test/ui.test.js`, then assert:
 
@@ -559,7 +559,7 @@ assert.doesNotMatch(html, /<img|onerror="PRIVATE"/);
 
 Also assert a null preview contains no confirmation controls, a count of 2 uses `2 vistelser`, and `canExport: false` keeps `choose-restore` while omitting `download-backup` and `download-csv`.
 
-- [ ] **Step 2: Add failing browser integration tests**
+- [x] **Step 2: Add failing browser integration tests**
 
 Extend the test browser setup so `createBrowserApp` receives:
 
@@ -590,7 +590,7 @@ node --test --test-name-pattern="backup|CSV|restore|data tools" test/ui.test.js
 
 Expected: FAIL on missing renderer/actions.
 
-- [ ] **Step 3: Create the escaped renderer**
+- [x] **Step 3: Create the escaped renderer**
 
 Create `src/ui/data-tools.js` with this complete implementation:
 
@@ -655,7 +655,7 @@ export function renderDataTools({
 
 The module exports only `renderDataTools`. The filename and every dynamic count are escaped before markup generation.
 
-- [ ] **Step 4: Compose data tools into the cockpit without redesign**
+- [x] **Step 4: Compose data tools into the cockpit without redesign**
 
 In `src/ui/cockpit.js` import `renderDataTools`, accept `restorePreview = null` in `buildCockpitModel` options, expose it on the model, and render `renderDataTools({ restorePreview: model.restorePreview, canExport: true })` in the existing aside only when `model.demo` is false.
 
@@ -663,7 +663,7 @@ In `src/ui/onboarding.js`, import `renderDataTools`, accept `restorePreview = nu
 
 In `src/main.js`, pass `published.restorePreview ?? null` to both renderers and pass `canExport: Boolean(published.state?.profile)` to onboarding. Existing renders without a preview must keep the same markup except for the new data section.
 
-- [ ] **Step 5: Add private browser download and injected seams**
+- [x] **Step 5: Add private browser download and injected seams**
 
 Import `MAX_IMPORT_BYTES` from `src/data-transfer.js`. Add a private default download helper in `src/main.js`:
 
@@ -703,7 +703,7 @@ const downloadFile = options.downloadFile
 
 Never log caught errors or include file content in an announcement.
 
-- [ ] **Step 6: Wire click and change behavior**
+- [x] **Step 6: Wire click and change behavior**
 
 In the app click delegation:
 
@@ -743,11 +743,11 @@ app.addEventListener("change", async (event) => {
 
 Wrap download helper calls in `try/catch` and announce `Filen kunde inte laddas ner.` on failure. Do not pass caught error messages into the UI.
 
-- [ ] **Step 7: Add only layout and target-size CSS**
+- [x] **Step 7: Add only layout and target-size CSS**
 
 Add compact rules for `.data-tools__actions` using the existing flex/gap patterns. Ensure every button is at least 44 px and the hidden file input uses the existing `.sr-only`. Do not add new colors, fonts, panels or responsive breakpoints unless a browser test demonstrates overflow.
 
-- [ ] **Step 8: Run targeted browser/controller tests and verify GREEN**
+- [x] **Step 8: Run targeted browser/controller tests and verify GREEN**
 
 Run:
 
@@ -759,7 +759,7 @@ git diff --check
 
 Expected: all commands exit 0, dynamic filenames are escaped, and no runtime console call exists.
 
-- [ ] **Step 9: Commit the browser data tools**
+- [x] **Step 9: Commit the browser data tools**
 
 Run:
 

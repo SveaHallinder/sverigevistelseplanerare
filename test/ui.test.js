@@ -8,10 +8,12 @@ import { serializeAppState } from "../src/storage.js";
 import { readProfileForm, renderOnboarding } from "../src/ui/onboarding.js";
 
 const cockpitModule = await import("../src/ui/cockpit.js").catch(() => ({}));
+const dataToolsModule = await import("../src/ui/data-tools.js").catch(() => ({}));
 const observationsModule = await import("../src/ui/observations.js").catch(() => ({}));
 const stayDialogModule = await import("../src/ui/stay-dialog.js").catch(() => ({}));
 const mainModule = await import("../src/main.js").catch(() => ({}));
 const { buildCockpitModel, renderCockpit, renderYearCalendar } = cockpitModule;
+const { renderDataTools } = dataToolsModule;
 const { renderObservations } = observationsModule;
 const {
   closeStayDialog,
@@ -776,6 +778,12 @@ class FakeEventRoot {
       handler(event);
     }
   }
+
+  async dispatchAsync(type, event) {
+    for (const handler of this.handlers.get(type) ?? []) {
+      await handler(event);
+    }
+  }
 }
 
 function actionTarget(action, dataset = {}) {
@@ -903,16 +911,313 @@ function createTestBrowserApp(state = cockpitState(), repositoryOptions = {}) {
   const windowRef = {
     crypto: { randomUUID: () => "browser-stay" }
   };
+  const downloads = [];
+  const readFileCalls = [];
+  const readFileText = async (file) => {
+    readFileCalls.push(file);
+    if (file.unreadable) {
+      throw new Error("kunde inte läsas");
+    }
+    return file.contents;
+  };
+  const downloadFile = (file) => downloads.push(file);
   const api = createBrowserApp({
     documentRef: browser.documentRef,
     windowRef,
     repository,
     today: "2026-08-16",
     now: () => "2026-08-16T12:00:00.000Z",
-    makeId: () => "browser-stay"
+    makeId: () => "browser-stay",
+    readFileText,
+    downloadFile
   });
-  return { ...browser, repository, windowRef, api };
+  return {
+    ...browser,
+    repository,
+    windowRef,
+    api,
+    downloads,
+    readFileCalls
+  };
 }
+
+function restorableAppState() {
+  return {
+    version: 1,
+    profile: {
+      departureDate: "2025-02-15",
+      budgetDays: 5,
+      periodStart: "2027-01-01",
+      periodEnd: "2027-12-31",
+      swedishCitizen: "no",
+      livedInSwedenTenYears: "no",
+      connectionChecklist: Object.fromEntries(
+        CHECKLIST_KEYS.map((key) => [key, "unanswered"])
+      )
+    },
+    stays: [{
+      id: "restored-stay",
+      arrivalDate: "2027-03-01",
+      departureDate: "2027-03-02",
+      status: "actual",
+      createdAt: "2026-08-01T12:00:00.000Z",
+      updatedAt: "2026-08-01T12:00:00.000Z"
+    }]
+  };
+}
+
+function restoreFile(overrides = {}) {
+  const contents = Object.hasOwn(overrides, "contents")
+    ? overrides.contents
+    : serializeAppState(restorableAppState());
+  return {
+    name: overrides.name ?? "min-backup.json",
+    size: overrides.size ?? contents?.length ?? 0,
+    contents,
+    unreadable: overrides.unreadable ?? false
+  };
+}
+
+function restoreInput(file) {
+  return {
+    value: "C:\\fakepath\\min-backup.json",
+    files: file ? [file] : [],
+    matches(selector) {
+      return selector === '[data-file-input="restore"]';
+    }
+  };
+}
+
+async function chooseRestoreFile(app, file) {
+  const input = restoreInput(file);
+  await app.dispatchAsync("change", { target: input });
+  return input;
+}
+
+test("renderDataTools escapes the preview filename and offers explicit actions", () => {
+  assert.equal(typeof renderDataTools, "function", "renderDataTools ska exporteras");
+  const html = renderDataTools({
+    canExport: true,
+    restorePreview: {
+      fileName: '<img src=x onerror="PRIVATE">.json',
+      hasProfile: true,
+      stayCount: 1
+    }
+  });
+
+  assert.match(html, /Din data/);
+  assert.match(html, /data-action="download-backup"/);
+  assert.match(html, /data-action="download-csv"/);
+  assert.match(html, /data-action="choose-restore"/);
+  assert.match(html, /data-file-input="restore"/);
+  assert.match(html, /data-action="confirm-restore"/);
+  assert.match(html, /data-action="cancel-restore"/);
+  assert.match(html, /1 vistelse/);
+  assert.doesNotMatch(html, /<img|onerror="PRIVATE"/);
+});
+
+test("renderDataTools hides confirmation without a preview and pluralises stays", () => {
+  const withoutPreview = renderDataTools({ canExport: true });
+  const twoStays = renderDataTools({
+    canExport: true,
+    restorePreview: { fileName: "b.json", hasProfile: false, stayCount: 2 }
+  });
+
+  assert.doesNotMatch(withoutPreview, /data-action="confirm-restore"/);
+  assert.doesNotMatch(withoutPreview, /data-action="cancel-restore"/);
+  assert.doesNotMatch(withoutPreview, /Ersätt aktuell data\?/);
+  assert.match(withoutPreview, /data-action="choose-restore"/);
+  assert.match(twoStays, /2 vistelser/);
+  assert.match(twoStays, /Ingen profil/);
+});
+
+test("renderDataTools keeps restore but omits downloads without a profile", () => {
+  const html = renderDataTools({ canExport: false });
+
+  assert.match(html, /data-action="choose-restore"/);
+  assert.match(html, /data-file-input="restore"/);
+  assert.doesNotMatch(html, /data-action="download-backup"/);
+  assert.doesNotMatch(html, /data-action="download-csv"/);
+});
+
+test("main downloads a canonical backup and a CSV without repository writes", () => {
+  const state = cockpitState();
+  const { app, repository, downloads } = createTestBrowserApp(state);
+
+  app.dispatch("click", { target: actionTarget("download-backup") });
+  app.dispatch("click", { target: actionTarget("download-csv") });
+
+  assert.equal(downloads.length, 2);
+  assert.deepEqual(downloads[0], {
+    filename: "sverigevistelseplaneraren-backup-2026-08-16.json",
+    mimeType: "application/json;charset=utf-8",
+    content: serializeAppState(state)
+  });
+  assert.equal(
+    downloads[1].filename,
+    "sverigevistelseplaneraren-vistelser-2026-08-16.csv"
+  );
+  assert.equal(downloads[1].mimeType, "text/csv;charset=utf-8");
+  assert.equal(
+    downloads[1].content,
+    "ankomstdatum,avresedatum,status,kalenderdagar\r\n"
+      + "2026-08-01,2026-08-02,faktisk,2\r\n"
+      + "2026-08-02,2026-08-06,planerad,5\r\n"
+  );
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("main announces an empty stay list instead of downloading a CSV", () => {
+  const { app, liveRegion, downloads } = createTestBrowserApp(
+    cockpitState({ stays: [] })
+  );
+
+  app.dispatch("click", { target: actionTarget("download-csv") });
+
+  assert.equal(downloads.length, 0);
+  assert.equal(liveRegion.textContent, "Det finns inga vistelser att exportera.");
+});
+
+test("main rejects an oversized backup before reading it", async () => {
+  const { app, liveRegion, readFileCalls, repository } = createTestBrowserApp();
+
+  await chooseRestoreFile(app, restoreFile({ size: 1_048_577 }));
+
+  assert.equal(readFileCalls.length, 0);
+  assert.equal(repository.calls.save.length, 0);
+  assert.match(liveRegion.textContent, /större än 1 MiB/);
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+});
+
+test("main keeps state and stored bytes when a chosen file is invalid", async () => {
+  const state = cockpitState();
+  const { app, liveRegion, repository, api } = createTestBrowserApp(state);
+
+  await chooseRestoreFile(app, restoreFile({ contents: "{inte-json" }));
+
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(api.controller.getSnapshot().state, state);
+  assert.equal(liveRegion.textContent, "Backupfilen innehåller inte giltig JSON.");
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+});
+
+test("main announces an unreadable file without exposing the caught error", async () => {
+  const { app, liveRegion, repository } = createTestBrowserApp();
+
+  await chooseRestoreFile(app, restoreFile({ unreadable: true }));
+
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(
+    liveRegion.textContent,
+    "Backupfilen kunde inte läsas. Ingen data har ändrats."
+  );
+});
+
+test("main can restore from onboarding and never saves before confirmation", async () => {
+  const { app, repository } = createTestBrowserApp(null);
+
+  assert.match(app.innerHTML, /Planera Sverigedagar/);
+  assert.match(app.innerHTML, /data-action="choose-restore"/);
+  assert.doesNotMatch(app.innerHTML, /data-action="download-backup"/);
+
+  await chooseRestoreFile(app, restoreFile());
+
+  assert.equal(repository.calls.save.length, 0);
+  assert.match(app.innerHTML, /Ersätt aktuell data\?/);
+  assert.match(app.innerHTML, /min-backup\.json/);
+  assert.match(app.innerHTML, /1 vistelse/);
+  assert.match(app.innerHTML, /data-action="confirm-restore"/);
+});
+
+test("main cancel-restore preserves state and returns focus to the chooser", async () => {
+  const state = cockpitState();
+  const { app, repository, api } = createTestBrowserApp(state);
+  await chooseRestoreFile(app, restoreFile());
+
+  app.dispatch("click", { target: actionTarget("cancel-restore") });
+
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(api.controller.getSnapshot().state, state);
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+  assert.ok(app.focusedSelectors.includes('[data-action="choose-restore"]'));
+});
+
+test("main confirm-restore saves once, replaces state and resets the view year", async () => {
+  const { app, repository, api } = createTestBrowserApp(cockpitState());
+  await chooseRestoreFile(app, restoreFile());
+
+  app.dispatch("click", { target: actionTarget("confirm-restore") });
+
+  assert.equal(repository.calls.save.length, 1);
+  assert.deepEqual(repository.calls.save[0], restorableAppState());
+  assert.deepEqual(api.controller.getSnapshot().state, restorableAppState());
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+  assert.match(app.innerHTML, /data-action="next-year" aria-label="Nästa år"/);
+  assert.match(app.innerHTML, /<h2>2027<\/h2>/);
+  assert.ok(app.focusedSelectors.includes('[data-action="choose-restore"]'));
+});
+
+test("main keeps the confirmation visible and warns about partial writes on conflict", async () => {
+  const state = cockpitState();
+  const conflict = {
+    ok: false,
+    issue: {
+      code: "storage-conflict",
+      message: "Sparad data har ändrats. Ladda om först."
+    },
+    mode: "local"
+  };
+  const { app, liveRegion, api } = createTestBrowserApp(state, {
+    saveResult: conflict
+  });
+  await chooseRestoreFile(app, restoreFile());
+
+  app.dispatch("click", { target: actionTarget("confirm-restore") });
+
+  assert.equal(api.controller.getSnapshot().state, state);
+  assert.match(app.innerHTML, /data-action="confirm-restore"/);
+  assert.match(liveRegion.textContent, /kan ha skrivits delvis/);
+  assert.match(liveRegion.textContent, /Avbryt återställningen och ladda om sidan/);
+  assert.match(liveRegion.textContent, /rensa appdatan och välj backupfilen igen/);
+  assert.ok(app.focusedSelectors.includes('[data-action="confirm-restore"]'));
+});
+
+test("main clears the file input so the same backup can be chosen twice", async () => {
+  const { app, repository } = createTestBrowserApp(cockpitState());
+
+  const first = await chooseRestoreFile(app, restoreFile());
+  assert.equal(first.value, "");
+  app.dispatch("click", { target: actionTarget("cancel-restore") });
+
+  const second = await chooseRestoreFile(app, restoreFile());
+  assert.equal(second.value, "");
+  assert.match(app.innerHTML, /Ersätt aktuell data\?/);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("main ignores a change event without a chosen file", async () => {
+  const { app, readFileCalls, liveRegion } = createTestBrowserApp();
+  liveRegion.textContent = "";
+
+  await chooseRestoreFile(app, null);
+
+  assert.equal(readFileCalls.length, 0);
+  assert.equal(liveRegion.textContent, "");
+});
+
+test("main demo has no data controls and keeps data workflows blocked", () => {
+  const { app, api, downloads } = createTestBrowserApp(null);
+  app.dispatch("click", { target: actionTarget("show-demo") });
+
+  assert.match(app.innerHTML, /Syntetiskt demoexempel/);
+  assert.doesNotMatch(app.innerHTML, /data-action="download-backup"/);
+  assert.doesNotMatch(app.innerHTML, /data-action="download-csv"/);
+  assert.doesNotMatch(app.innerHTML, /data-action="choose-restore"/);
+  assert.doesNotMatch(app.innerHTML, /data-file-input="restore"/);
+  assert.equal(api.controller.createBackupDownload().ok, false);
+  assert.equal(api.controller.createCsvDownload().ok, false);
+  assert.equal(downloads.length, 0);
+});
 
 test("main can be imported without browser globals and renders the loaded cockpit", () => {
   const { app, api } = createTestBrowserApp();

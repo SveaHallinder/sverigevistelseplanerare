@@ -1,4 +1,5 @@
 import { createAppController } from "./controller.js";
+import { MAX_IMPORT_BYTES } from "./data-transfer.js";
 import { evaluatePlannedStay } from "./domain/budget.js";
 import { addDays, isIsoDate, todayLocalIso } from "./domain/dates.js";
 import { createStateRepository } from "./storage.js";
@@ -38,6 +39,30 @@ function yearFromDate(date) {
   return Number(date.slice(0, 4));
 }
 
+function defaultDownloadFile(documentRef, windowRef, file) {
+  const BlobType = safeWindowValue(windowRef, "Blob") ?? globalThis.Blob;
+  const urlApi = safeWindowValue(windowRef, "URL") ?? globalThis.URL;
+  if (
+    typeof BlobType !== "function"
+    || typeof urlApi?.createObjectURL !== "function"
+    || typeof urlApi?.revokeObjectURL !== "function"
+  ) {
+    throw new Error("Nedladdning stöds inte i den här webbläsaren.");
+  }
+  const blob = new BlobType([file.content], { type: file.mimeType });
+  const url = urlApi.createObjectURL(blob);
+  try {
+    const link = documentRef.createElement("a");
+    link.href = url;
+    link.download = file.filename;
+    documentRef.body?.append?.(link);
+    link.click();
+    link.remove?.();
+  } finally {
+    urlApi.revokeObjectURL(url);
+  }
+}
+
 export function createBrowserApp(options = {}) {
   const documentRef = options.documentRef ?? globalThis.document;
   const windowRef = options.windowRef ?? globalThis.window ?? {};
@@ -55,6 +80,9 @@ export function createBrowserApp(options = {}) {
     localStorage: safeWindowValue(windowRef, "localStorage"),
     sessionStorage: safeWindowValue(windowRef, "sessionStorage")
   });
+  const readFileText = options.readFileText ?? ((file) => file.text());
+  const downloadFile = options.downloadFile
+    ?? ((file) => defaultDownloadFile(documentRef, windowRef, file));
   let published = null;
   let viewYear = yearFromDate(today);
   let focusedDate = today;
@@ -78,7 +106,8 @@ export function createBrowserApp(options = {}) {
         focusedDate,
         storageIssue: published.storageIssue,
         clearRequested,
-        demo: published.demo
+        demo: published.demo,
+        restorePreview: published.restorePreview ?? null
       });
       focusedDate = model.focusedDate;
       app.innerHTML = renderCockpit(model);
@@ -91,7 +120,9 @@ export function createBrowserApp(options = {}) {
       storageIssue: published.storageIssue,
       editing: published.editingProfile,
       clearRequested,
-      defaultYear: today.slice(0, 4)
+      defaultYear: today.slice(0, 4),
+      restorePreview: published.restorePreview ?? null,
+      canExport: Boolean(published.state?.profile)
     });
   }
 
@@ -265,6 +296,43 @@ export function createBrowserApp(options = {}) {
       clearRequested = false;
       renderPublished();
       app.querySelector?.('[data-action="request-clear"]')?.focus?.();
+    } else if (action === "download-backup" || action === "download-csv") {
+      const created = action === "download-backup"
+        ? controller.createBackupDownload()
+        : controller.createCsvDownload();
+      if (!created.ok) {
+        announce(created.message);
+        return;
+      }
+      try {
+        downloadFile(created.download);
+      } catch {
+        announce("Filen kunde inte laddas ner.");
+        return;
+      }
+      announce(created.message);
+    } else if (action === "choose-restore") {
+      app.querySelector?.('[data-file-input="restore"]')?.click?.();
+    } else if (action === "cancel-restore") {
+      const cancelled = controller.cancelRestore();
+      announce(cancelled.message);
+      app.querySelector?.('[data-action="choose-restore"]')?.focus?.();
+    } else if (action === "confirm-restore") {
+      const confirmed = controller.confirmRestore({ confirmed: true });
+      announce(confirmed.message);
+      if (!confirmed.ok) {
+        app.querySelector?.('[data-action="confirm-restore"]')?.focus?.();
+        return;
+      }
+      const restored = controller.getSnapshot().state;
+      if (restored?.profile) {
+        viewYear = yearFromDate(restored.profile.periodStart);
+        focusedDate = yearFromDate(today) === viewYear
+          ? today
+          : restored.profile.periodStart;
+        renderPublished();
+      }
+      (app.querySelector?.('[data-action="choose-restore"]') ?? app)?.focus?.();
     } else if (action === "confirm-clear") {
       const cleared = controller.clearAll({ confirmed: true });
       clearRequested = !cleared.ok;
@@ -273,6 +341,30 @@ export function createBrowserApp(options = {}) {
       if (!cleared.ok) {
         app.querySelector?.('[data-action="confirm-clear"]')?.focus?.();
       }
+    }
+  });
+
+  app.addEventListener("change", async (event) => {
+    if (!event.target?.matches?.('[data-file-input="restore"]')) return;
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (file.size > MAX_IMPORT_BYTES) {
+      announce("Backupfilen är större än 1 MiB och har inte lästs in.");
+      return;
+    }
+    let raw;
+    try {
+      raw = await readFileText(file);
+    } catch {
+      announce("Backupfilen kunde inte läsas. Ingen data har ändrats.");
+      return;
+    }
+    const previewed = controller.previewRestore({ raw, fileName: file.name });
+    announce(previewed.message);
+    if (previewed.ok) {
+      app.querySelector?.('[data-action="confirm-restore"]')?.focus?.();
     }
   });
 
