@@ -265,7 +265,7 @@ git commit -m "fix: reject hidden stays without a profile"
 - Create: `src/domain/budget-explanation.js`
 - Create: `test/budget-explanation.test.js`
 
-- [ ] **Step 1: Write the explanation contract test before the module exists**
+- [x] **Step 1: Write the explanation contract test before the module exists**
 
 Create `test/budget-explanation.test.js` with:
 
@@ -349,7 +349,7 @@ test("buildBudgetExplanation has stable empty ranges", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run:
 
@@ -359,7 +359,7 @@ node --test test/budget-explanation.test.js
 
 Expected: FAIL because `buildBudgetExplanation` is missing.
 
-- [ ] **Step 3: Implement the pure composition module**
+- [x] **Step 3: Implement the pure composition module**
 
 Create `src/domain/budget-explanation.js` with:
 
@@ -445,7 +445,7 @@ export function buildBudgetExplanation(profile, stays) {
 }
 ```
 
-- [ ] **Step 4: Run explanation and dependency tests and verify GREEN**
+- [x] **Step 4: Run explanation and dependency tests and verify GREEN**
 
 Run:
 
@@ -455,7 +455,7 @@ node --test test/budget-explanation.test.js test/budget.test.js test/patterns.te
 
 Expected: PASS with no mutation of inputs.
 
-- [ ] **Step 5: Commit the pure explanation model**
+- [x] **Step 5: Commit the pure explanation model**
 
 Run:
 
