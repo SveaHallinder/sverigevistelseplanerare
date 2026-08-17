@@ -473,7 +473,7 @@ git commit -m "feat: explain personal budget calculations"
 - Modify: `styles.css`
 - Modify: `test/ui.test.js`
 
-- [ ] **Step 1: Add failing model and markup assertions**
+- [x] **Step 1: Add failing model and markup assertions**
 
 In `test/ui.test.js`, extend the cockpit model test to assert:
 
@@ -522,7 +522,7 @@ test("renderCockpit explains registered-day boundaries without legal certainty",
 });
 ```
 
-- [ ] **Step 2: Run the focused UI tests and verify RED**
+- [x] **Step 2: Run the focused UI tests and verify RED**
 
 Run:
 
@@ -532,7 +532,7 @@ node --test --test-name-pattern="explains registered-day|overlap-aware KPIs" tes
 
 Expected: FAIL because `explanation` and the disclosure do not exist.
 
-- [ ] **Step 3: Create the escaped explanation renderer**
+- [x] **Step 3: Create the escaped explanation renderer**
 
 Create `src/ui/budget-explanation.js` with this complete implementation:
 
@@ -644,7 +644,7 @@ export function renderBudgetExplanation(model) {
 
 The module exports only `renderBudgetExplanation`. Empty arrays produce neutral copy, one-day ranges print one date, longer ranges print both endpoints, and the combined scenario paragraph renders only when planned stays exist.
 
-- [ ] **Step 4: Compose the explanation in the cockpit**
+- [x] **Step 4: Compose the explanation in the cockpit**
 
 In `src/ui/cockpit.js`:
 
@@ -668,7 +668,7 @@ In `renderBudgetStatus`, append this sentence when `firstExceededDate` exists:
 
 Render `renderBudgetExplanation(model.explanation)` directly after the current budget-status section and before the legend. Do not move or redesign existing cockpit sections.
 
-- [ ] **Step 5: Add only the accessibility CSS needed by the native disclosure**
+- [x] **Step 5: Add only the accessibility CSS needed by the native disclosure**
 
 Append to the relevant cockpit section in `styles.css`:
 
@@ -696,7 +696,7 @@ Append to the relevant cockpit section in `styles.css`:
 
 If token names differ, reuse the existing surface/border tokens from the top of `styles.css`; do not introduce a parallel palette.
 
-- [ ] **Step 6: Run focused and full UI tests and verify GREEN**
+- [x] **Step 6: Run focused and full UI tests and verify GREEN**
 
 Run:
 
@@ -713,7 +713,7 @@ git diff --check
 
 Expected: both exit 0.
 
-- [ ] **Step 7: Commit the functional disclosure**
+- [x] **Step 7: Commit the functional disclosure**
 
 Run:
 

@@ -1,8 +1,10 @@
 import { calculateBudget } from "../domain/budget.js";
+import { buildBudgetExplanation } from "../domain/budget-explanation.js";
 import { addDays, isIsoDate } from "../domain/dates.js";
 import { buildObservations } from "../domain/observations.js";
 import { getPastPlannedStays } from "../domain/stays.js";
 import { LEGAL_SOURCES } from "../legal-content.js";
+import { renderBudgetExplanation } from "./budget-explanation.js";
 import { renderObservations } from "./observations.js";
 
 const MONTHS = [
@@ -116,6 +118,7 @@ export function buildCockpitModel(state, {
     stays: [...state.stays].sort((left, right) =>
       left.arrivalDate.localeCompare(right.arrivalDate)),
     budget,
+    explanation: buildBudgetExplanation(state.profile, state.stays),
     observations: buildObservations(state.profile, state.stays),
     pastPlanned: getPastPlannedStays(state.stays, today),
     statusByDate: budget.statusByDate,
@@ -239,6 +242,10 @@ function renderBudgetStatus(model) {
     ? "<p>Senaste registrerade dag inom budget: " +
       escapeHtml(formatDate(model.budget.lastWithinBudgetDate)) + "</p>"
     : "<p>Ingen budgetgräns nås av den registrerade planen.</p>";
+  const exceeded = model.budget.firstExceededDate
+    ? "<p>Första registrerade dag över budget: " +
+      escapeHtml(formatDate(model.budget.firstExceededDate)) + "</p>"
+    : "";
   const meterValue = Math.min(model.budget.uniqueDays, model.profile.budgetDays);
   const fill = Math.min(100, Math.round(
     (model.budget.uniqueDays / model.profile.budgetDays) * 100
@@ -257,7 +264,7 @@ function renderBudgetStatus(model) {
   return '<section class="budget-status" aria-labelledby="budget-heading">' +
     '<div><p class="section-kicker">Personlig dagbudget</p>' +
     '<h2 id="budget-heading">' + escapeHtml(budgetCopy) + "</h2>" + boundary +
-    excluded + "</div>" +
+    exceeded + excluded + "</div>" +
     '<div class="budget-meter" role="progressbar" aria-label="Använd dagbudget" ' +
     'aria-valuemin="0" aria-valuemax="' + escapeHtml(model.profile.budgetDays) +
     '" aria-valuenow="' + escapeHtml(meterValue) + '" style="--budget-fill: ' +
@@ -318,6 +325,7 @@ export function renderCockpit(model) {
   return '<div class="cockpit-shell">' + demoBanner + storageBanner +
     renderHeader(model) + '<div class="cockpit-content">' + renderSummary(model) +
     renderBudgetStatus(model) +
+    renderBudgetExplanation(model.explanation) +
     '<div class="legend" aria-label="Kalenderförklaring">' +
     '<span class="legend__item legend--actual"><i aria-hidden="true"></i>Faktisk</span>' +
     '<span class="legend__item legend--planned"><i aria-hidden="true"></i>Planerad</span>' +

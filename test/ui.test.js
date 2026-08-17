@@ -322,6 +322,58 @@ test("buildCockpitModel preserves actual precedence and calculates overlap-aware
   assert.equal(model.budget.overBy, 1);
   assert.equal(model.budget.lastWithinBudgetDate, "2026-08-05");
   assert.equal(model.statusByDate["2026-08-02"], "actual");
+  assert.equal(model.explanation.totals.overlapDays, 1);
+  assert.equal(model.explanation.boundary.firstExceededDate, "2026-08-06");
+});
+
+test("renderCockpit explains registered-day boundaries without legal certainty", () => {
+  const model = buildCockpitModel(cockpitState({
+    profile: { budgetDays: 5 },
+    stays: [
+      {
+        id: "actual",
+        arrivalDate: "2026-08-01",
+        departureDate: "2026-08-02",
+        status: "actual",
+        createdAt: "2026-08-01T12:00:00.000Z",
+        updatedAt: "2026-08-01T12:00:00.000Z"
+      },
+      {
+        id: "planned",
+        arrivalDate: "2026-08-02",
+        departureDate: "2026-08-06",
+        status: "planned",
+        createdAt: "2026-08-01T12:00:00.000Z",
+        updatedAt: "2026-08-01T12:00:00.000Z"
+      }
+    ]
+  }), { today: "2026-08-16" });
+
+  const html = renderCockpit(model);
+
+  assert.match(html, /Så räknas planen/);
+  assert.match(html, /Första registrerade dag över budget/);
+  assert.match(html, /6 augusti 2026/);
+  assert.match(html, /Ankomst- och avresedag räknas/);
+  assert.match(html, /överlappande datum räknas en gång/);
+  assert.match(html, /Faktisk historik/);
+  assert.match(html, /Faktisk plus planerad/);
+  assert.match(html, /personliga budget, inte en juridisk gräns/);
+  assert.doesNotMatch(html, /säker|laglig|måste lämna/i);
+});
+
+test("renderCockpit uses singular day copy in the calculation disclosure", () => {
+  const overByOne = renderCockpit(buildCockpitModel(cockpitState({
+    profile: { budgetDays: 5 }
+  }), { today: "2026-08-16" }));
+  const remainingOne = renderCockpit(buildCockpitModel(cockpitState({
+    profile: { budgetDays: 7 }
+  }), { today: "2026-08-16" }));
+
+  assert.match(overByOne, /1 dag över den personliga budgeten/);
+  assert.doesNotMatch(overByOne, /1 dagar över den personliga budgeten/);
+  assert.match(remainingOne, /1 dag kvar i den personliga budgeten/);
+  assert.doesNotMatch(remainingOne, /1 dagar kvar i den personliga budgeten/);
 });
 
 test("renderCockpit explains budget boundary and statuses with more than colour", () => {
