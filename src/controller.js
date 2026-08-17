@@ -5,6 +5,11 @@ import {
   setProfile,
   updateStay
 } from "./domain/state.js";
+import {
+  createBackupJson,
+  createStayCsv as encodeStayCsv,
+  parseBackupJson
+} from "./data-transfer.js";
 import { createDemoState } from "./demo-state.js";
 
 const BLOCKING_STORAGE_ISSUES = new Set([
@@ -27,6 +32,8 @@ export function createAppController({
   let storageIssue = null;
   let demoState = null;
   let editingProfile = false;
+  let restoreCandidate = null;
+  let restorePreview = null;
 
   function publish() {
     render({
@@ -34,12 +41,13 @@ export function createAppController({
       storageIssue,
       demo: demoState !== null,
       editingProfile,
-      today
+      today,
+      ...(restorePreview ? { restorePreview } : {})
     });
   }
 
-  function result(ok, message = "", fieldErrors = {}) {
-    return { ok, message, fieldErrors };
+  function result(ok, message = "", fieldErrors = {}, extra = {}) {
+    return { ok, message, fieldErrors, ...extra };
   }
 
   function blockedByDemo() {
@@ -54,7 +62,13 @@ export function createAppController({
       : null;
   }
 
-  function persist(nextState, message) {
+  function blockedByRestore() {
+    return restoreCandidate === null
+      ? null
+      : result(false, "Bekräfta eller avbryt återställningen först.");
+  }
+
+  function persist(nextState, message, { onSuccess } = {}) {
     const blocked = blockedByStorage();
     if (blocked) return blocked;
     const saved = repository.save(nextState);
@@ -66,6 +80,7 @@ export function createAppController({
     state = nextState;
     demoState = null;
     editingProfile = false;
+    onSuccess?.();
     publish();
     return result(true, message);
   }
@@ -79,7 +94,7 @@ export function createAppController({
   }
 
   function saveProfile(input) {
-    const blocked = blockedByDemo();
+    const blocked = blockedByRestore() ?? blockedByDemo();
     if (blocked) return blocked;
     const base = state ?? createEmptyState();
     const changed = setProfile(base, input);
@@ -89,7 +104,7 @@ export function createAppController({
   }
 
   function saveStay(input, id = null) {
-    const blocked = blockedByDemo();
+    const blocked = blockedByRestore() ?? blockedByDemo();
     if (blocked) return blocked;
     if (!state?.profile) {
       return result(false, "Skapa en profil innan du lägger till vistelser.");
@@ -107,7 +122,7 @@ export function createAppController({
   }
 
   function removeStay(id) {
-    const blocked = blockedByDemo();
+    const blocked = blockedByRestore() ?? blockedByDemo();
     if (blocked) return blocked;
     if (!state) {
       return result(false, "Vistelsen kunde inte hittas.");
@@ -119,7 +134,7 @@ export function createAppController({
   }
 
   function confirmPastPlanned(id) {
-    const blocked = blockedByDemo();
+    const blocked = blockedByRestore() ?? blockedByDemo();
     if (blocked) return blocked;
     const current = state?.stays.find((stay) => stay.id === id);
     if (!current) {
@@ -139,6 +154,8 @@ export function createAppController({
   }
 
   function showDemo() {
+    const blocked = blockedByRestore();
+    if (blocked) return blocked;
     if (state?.profile) {
       return result(false, "Demo kan bara öppnas innan en egen plan har skapats.");
     }
@@ -154,7 +171,7 @@ export function createAppController({
   }
 
   function beginEditProfile() {
-    const blocked = blockedByDemo();
+    const blocked = blockedByRestore() ?? blockedByDemo();
     if (blocked) return blocked;
     editingProfile = true;
     publish();
@@ -162,13 +179,15 @@ export function createAppController({
   }
 
   function cancelEditProfile() {
+    const blocked = blockedByRestore();
+    if (blocked) return blocked;
     editingProfile = false;
     publish();
     return result(true);
   }
 
   function clearAll({ confirmed = false } = {}) {
-    const blocked = blockedByDemo();
+    const blocked = blockedByRestore() ?? blockedByDemo();
     if (blocked) return blocked;
     if (!confirmed) {
       return result(false, "Bekräfta att profilen och alla vistelser ska tas bort.");
@@ -186,8 +205,91 @@ export function createAppController({
     demoState = null;
     storageIssue = null;
     editingProfile = false;
+    restoreCandidate = null;
+    restorePreview = null;
     publish();
     return result(true, "All lokal appdata har rensats.");
+  }
+
+  function createDownload(codec, filename, mimeType, emptyMessage = null) {
+    const blocked = blockedByDemo();
+    if (blocked) return blocked;
+    if (!state?.profile) {
+      return result(false, "Skapa en profil innan du exporterar data.");
+    }
+    if (emptyMessage && state.stays.length === 0) {
+      return result(false, emptyMessage);
+    }
+    const encoded = codec(state);
+    return encoded.ok
+      ? result(true, "Filen är klar.", {}, {
+          download: { filename, mimeType, content: encoded.value }
+        })
+      : result(false, encoded.message);
+  }
+
+  function createBackupDownload() {
+    return createDownload(
+      createBackupJson,
+      "sverigevistelseplaneraren-backup-" + today + ".json",
+      "application/json;charset=utf-8"
+    );
+  }
+
+  function createCsvDownload() {
+    return createDownload(
+      encodeStayCsv,
+      "sverigevistelseplaneraren-vistelser-" + today + ".csv",
+      "text/csv;charset=utf-8",
+      "Det finns inga vistelser att exportera."
+    );
+  }
+
+  function previewRestore({ raw, fileName }) {
+    const blocked = blockedByDemo() ?? blockedByStorage();
+    if (blocked) return blocked;
+    const parsed = parseBackupJson(raw);
+    if (!parsed.ok) {
+      return result(false, parsed.message);
+    }
+    restoreCandidate = parsed.value;
+    restorePreview = {
+      fileName: String(fileName || "backup.json").slice(0, 255),
+      hasProfile: parsed.value.profile !== null,
+      stayCount: parsed.value.stays.length
+    };
+    publish();
+    return result(true, "Backupfilen är kontrollerad.");
+  }
+
+  function cancelRestore() {
+    restoreCandidate = null;
+    restorePreview = null;
+    publish();
+    return result(true, "Återställningen har avbrutits.");
+  }
+
+  function confirmRestore({ confirmed = false } = {}) {
+    const blocked = blockedByDemo();
+    if (blocked) return blocked;
+    if (restoreCandidate === null || !confirmed) {
+      return result(false, "Bekräfta att den aktuella datan ska ersättas.");
+    }
+    const restored = persist(restoreCandidate, "Backupen har återställts.", {
+      onSuccess() {
+        restoreCandidate = null;
+        restorePreview = null;
+      }
+    });
+    if (!restored.ok && storageIssue?.code === "storage-conflict") {
+      return result(
+        false,
+        "Återställningen kunde inte slutföras. Backupen kan ha skrivits "
+          + "delvis. Avbryt återställningen och ladda om sidan. Om "
+          + "lagringsvarningen kvarstår, rensa appdatan och välj backupfilen igen."
+      );
+    }
+    return restored;
   }
 
   function getSnapshot() {
@@ -211,6 +313,11 @@ export function createAppController({
     beginEditProfile,
     cancelEditProfile,
     clearAll,
+    createBackupDownload,
+    createCsvDownload,
+    previewRestore,
+    cancelRestore,
+    confirmRestore,
     getSnapshot
   };
 }

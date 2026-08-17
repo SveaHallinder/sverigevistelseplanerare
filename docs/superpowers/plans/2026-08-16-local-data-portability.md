@@ -286,7 +286,7 @@ git commit -m "feat: encode local backups and stay exports"
 - Modify: `test/controller.test.js`
 - Modify: `test/storage.test.js`
 
-- [ ] **Step 1: Extend the exact controller API test**
+- [x] **Step 1: Extend the exact controller API test**
 
 Add these names to the sorted expected API in `test/controller.test.js`:
 
@@ -298,7 +298,7 @@ Add these names to the sorted expected API in `test/controller.test.js`:
 "previewRestore",
 ```
 
-- [ ] **Step 2: Add failing backup/export controller tests**
+- [x] **Step 2: Add failing backup/export controller tests**
 
 Add tests that initialize a controller with a valid state, then assert:
 
@@ -344,7 +344,7 @@ node --test test/controller.test.js
 
 Expected: FAIL on missing methods and preview state.
 
-- [ ] **Step 4: Add controller imports, state and result payload support**
+- [x] **Step 4: Add controller imports, state and result payload support**
 
 At the top of `src/controller.js` import:
 
@@ -377,7 +377,7 @@ In `publish`, add the preview only while it exists:
 ...(restorePreview ? { restorePreview } : {})
 ```
 
-- [ ] **Step 5: Add restore blocking and successful-persist cleanup**
+- [x] **Step 5: Add restore blocking and successful-persist cleanup**
 
 Add:
 
@@ -412,7 +412,7 @@ function persist(nextState, message, { onSuccess } = {}) {
 
 At the beginning of `saveProfile`, `saveStay`, `removeStay`, `confirmPastPlanned`, `showDemo`, `beginEditProfile`, `cancelEditProfile` and `clearAll`, combine the current demo guard with `blockedByRestore`. Do not apply the restore guard to read-only exports, `previewRestore`, `cancelRestore` or `confirmRestore`.
 
-- [ ] **Step 6: Implement download and restore use cases**
+- [x] **Step 6: Implement download and restore use cases**
 
 Add these functions inside `createAppController`:
 
@@ -501,7 +501,7 @@ function confirmRestore({ confirmed = false } = {}) {
 
 On successful `clearAll`, also set both restore variables to `null`. Add the five new functions to the returned public controller object. Do not expose `restoreCandidate` through `publish` or `getSnapshot`.
 
-- [ ] **Step 7: Run controller, storage and codec tests and verify GREEN**
+- [x] **Step 7: Run controller, storage and codec tests and verify GREEN**
 
 Run:
 
@@ -513,7 +513,7 @@ git diff --check
 
 Expected: all commands exit 0. Confirm the controller test proves the old controller state and preview survive, while the real repository test proves persisted layers can differ after the reported failure and the returned copy warns about it.
 
-- [ ] **Step 8: Commit the controller workflows**
+- [x] **Step 8: Commit the controller workflows**
 
 Run:
 

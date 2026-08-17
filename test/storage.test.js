@@ -1690,3 +1690,28 @@ test("issues never expose serialized personal values or date fixtures", () => {
     }
   }
 });
+
+test("restore keeps the old session bytes when neutralization fails after a local write", () => {
+  const oldRaw = serializeAppState(validState);
+  const candidate = {
+    version: 1,
+    profile: { ...validProfile, budgetDays: 45 },
+    stays: []
+  };
+  const candidateRaw = serializeAppState(candidate);
+  const localStorage = createFakeStorage({ [STORAGE_KEY]: oldRaw });
+  const sessionStorage = createFakeStorage(
+    { [STORAGE_KEY]: oldRaw },
+    { removeItem: true, setItem: true }
+  );
+  const repository = createStateRepository({ localStorage, sessionStorage });
+
+  assert.deepEqual(repository.save(candidate), {
+    ok: false,
+    issue: STORAGE_CONFLICT_ISSUE,
+    mode: "local"
+  });
+  assert.equal(localStorage.values.get(STORAGE_KEY), candidateRaw);
+  assert.equal(sessionStorage.values.get(STORAGE_KEY), oldRaw);
+  assert.notEqual(candidateRaw, oldRaw);
+});

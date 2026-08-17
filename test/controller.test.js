@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CHECKLIST_KEYS } from "../src/domain/validation.js";
+import { serializeAppState } from "../src/storage.js";
 
 const controllerModule = await import("../src/controller.js").catch(() => ({}));
 const { createAppController } = controllerModule;
@@ -87,11 +88,16 @@ test("controller exposes only the planned use-case API", () => {
   assert.deepEqual(Object.keys(controller).sort(), [
     "beginEditProfile",
     "cancelEditProfile",
+    "cancelRestore",
     "clearAll",
     "confirmPastPlanned",
+    "confirmRestore",
+    "createBackupDownload",
+    "createCsvDownload",
     "exitDemo",
     "getSnapshot",
     "init",
+    "previewRestore",
     "removeStay",
     "saveProfile",
     "saveStay",
@@ -437,4 +443,342 @@ test("a failed clear preserves the loaded state", () => {
     code: "clear-failed",
     message: "All appdata kunde inte rensas."
   });
+});
+
+function backupRaw(state) {
+  return serializeAppState(state);
+}
+
+function restorableState() {
+  return appState({
+    profile: { budgetDays: 30 },
+    stays: [stay("restored", { arrivalDate: "2026-09-01", departureDate: "2026-09-02" })]
+  });
+}
+
+test("createBackupDownload and createCsvDownload never write to the repository", () => {
+  const initialState = appState({ stays: [stay("one")] });
+  const repository = fakeRepository({ state: initialState });
+  const { controller } = setup({ repository });
+  controller.init();
+
+  const backup = controller.createBackupDownload();
+  assert.equal(backup.ok, true);
+  assert.equal(
+    backup.download.filename,
+    "sverigevistelseplaneraren-backup-2026-08-16.json"
+  );
+  assert.equal(backup.download.mimeType, "application/json;charset=utf-8");
+  assert.deepEqual(JSON.parse(backup.download.content), initialState);
+
+  const csv = controller.createCsvDownload();
+  assert.equal(csv.ok, true);
+  assert.equal(
+    csv.download.filename,
+    "sverigevistelseplaneraren-vistelser-2026-08-16.csv"
+  );
+  assert.equal(csv.download.mimeType, "text/csv;charset=utf-8");
+  assert.match(
+    csv.download.content,
+    /^ankomstdatum,avresedatum,status,kalenderdagar\r\n/
+  );
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("createCsvDownload refuses an empty stay list without a download", () => {
+  const repository = fakeRepository({ state: appState() });
+  const { controller } = setup({ repository });
+  controller.init();
+
+  const csv = controller.createCsvDownload();
+
+  assert.equal(csv.ok, false);
+  assert.equal(csv.message, "Det finns inga vistelser att exportera.");
+  assert.equal(Object.hasOwn(csv, "download"), false);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("downloads require a real profile before exporting", () => {
+  const { controller } = setup();
+  controller.init();
+
+  assert.deepEqual(controller.createBackupDownload(), {
+    ok: false,
+    message: "Skapa en profil innan du exporterar data.",
+    fieldErrors: {}
+  });
+});
+
+test("previewRestore validates without saving and publishes only safe fields", () => {
+  const initialState = appState({ stays: [stay("existing")] });
+  const repository = fakeRepository({ state: initialState });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+
+  const previewed = controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "min-backup.json"
+  });
+
+  assert.equal(previewed.ok, true);
+  assert.equal(previewed.message, "Backupfilen är kontrollerad.");
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(controller.getSnapshot().state, initialState);
+  assert.deepEqual(renders.at(-1).restorePreview, {
+    fileName: "min-backup.json",
+    hasProfile: true,
+    stayCount: 1
+  });
+  assert.equal(Object.hasOwn(controller.getSnapshot(), "restoreCandidate"), false);
+});
+
+test("invalid and unsupported backups never publish a preview or save", async (context) => {
+  const cases = [
+    ["invalid JSON", "{inte-json", "Backupfilen innehåller inte giltig JSON."],
+    [
+      "unsupported version",
+      JSON.stringify({ version: 2, profile: null, stays: [] }),
+      "Backupfilens version stöds inte."
+    ],
+    [
+      "invalid structure",
+      JSON.stringify({ version: 1, profile: null, stays: [{}] }),
+      "Backupfilen har en ogiltig struktur."
+    ]
+  ];
+
+  for (const [name, raw, message] of cases) {
+    await context.test(name, () => {
+      const initialState = appState({ stays: [stay("existing")] });
+      const repository = fakeRepository({ state: initialState });
+      const { controller, renders } = setup({ repository });
+      controller.init();
+      const rendersBefore = renders.length;
+
+      const previewed = controller.previewRestore({ raw, fileName: "x.json" });
+
+      assert.equal(previewed.ok, false);
+      assert.equal(previewed.message, message);
+      assert.equal(repository.calls.save.length, 0);
+      assert.equal(controller.getSnapshot().state, initialState);
+      assert.equal(renders.length, rendersBefore);
+      assert.equal(Object.hasOwn(renders.at(-1), "restorePreview"), false);
+    });
+  }
+});
+
+test("confirmRestore without explicit confirmation never saves", () => {
+  const repository = fakeRepository({ state: appState() });
+  const { controller } = setup({ repository });
+  controller.init();
+  controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+
+  const unconfirmed = controller.confirmRestore();
+
+  assert.equal(unconfirmed.ok, false);
+  assert.equal(unconfirmed.message, "Bekräfta att den aktuella datan ska ersättas.");
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("cancelRestore clears the preview and preserves current data", () => {
+  const initialState = appState({ stays: [stay("existing")] });
+  const repository = fakeRepository({ state: initialState });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+  controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+
+  const cancelled = controller.cancelRestore();
+
+  assert.equal(cancelled.ok, true);
+  assert.equal(cancelled.message, "Återställningen har avbrutits.");
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(controller.getSnapshot().state, initialState);
+  assert.equal(Object.hasOwn(renders.at(-1), "restorePreview"), false);
+  assert.equal(controller.confirmRestore({ confirmed: true }).ok, false);
+});
+
+test("a confirmed restore saves once and replaces state only after success", () => {
+  const initialState = appState({ stays: [stay("existing")] });
+  const candidate = restorableState();
+  const repository = fakeRepository({ state: initialState });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+  controller.previewRestore({
+    raw: backupRaw(candidate),
+    fileName: "backup.json"
+  });
+
+  const restored = controller.confirmRestore({ confirmed: true });
+
+  assert.equal(restored.ok, true);
+  assert.equal(restored.message, "Backupen har återställts.");
+  assert.equal(repository.calls.save.length, 1);
+  assert.deepEqual(repository.calls.save[0], candidate);
+  assert.deepEqual(controller.getSnapshot().state, candidate);
+  assert.equal(Object.hasOwn(renders.at(-1), "restorePreview"), false);
+});
+
+test("a failed restore save keeps state, keeps the preview and warns about partial writes", () => {
+  const initialState = appState({ stays: [stay("existing")] });
+  const failure = {
+    ok: false,
+    issue: {
+      code: "storage-conflict",
+      message: "Sparad data har ändrats. Ladda om först."
+    },
+    mode: "local"
+  };
+  const repository = fakeRepository({ state: initialState, saveResult: failure });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+  controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+
+  const restored = controller.confirmRestore({ confirmed: true });
+
+  assert.equal(restored.ok, false);
+  assert.match(restored.message, /kan ha skrivits delvis/);
+  assert.match(restored.message, /Avbryt återställningen och ladda om sidan/);
+  assert.match(restored.message, /rensa appdatan och välj backupfilen igen/);
+  assert.doesNotMatch(restored.message, /oförändrad|inte ändrats/);
+  assert.equal(controller.getSnapshot().state, initialState);
+  assert.deepEqual(controller.getSnapshot().storageIssue, failure.issue);
+  assert.deepEqual(renders.at(-1).restorePreview, {
+    fileName: "backup.json",
+    hasProfile: true,
+    stayCount: 1
+  });
+});
+
+test("demo mode blocks every data workflow", () => {
+  const repository = fakeRepository();
+  const { controller } = setup({ repository });
+  controller.init();
+  controller.showDemo();
+
+  const attempts = [
+    controller.createBackupDownload(),
+    controller.createCsvDownload(),
+    controller.previewRestore({
+      raw: backupRaw(restorableState()),
+      fileName: "backup.json"
+    }),
+    controller.confirmRestore({ confirmed: true })
+  ];
+
+  assert.ok(attempts.every((attempt) => attempt.ok === false));
+  assert.ok(attempts.every((attempt) => /Avsluta demoexemplet/.test(attempt.message)));
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("a pending restore preview blocks every mutation until it is resolved", () => {
+  const initialState = appState({ stays: [stay("existing")] });
+  const repository = fakeRepository({ state: initialState });
+  const { controller } = setup({ repository });
+  controller.init();
+  controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+
+  const attempts = [
+    controller.saveProfile(profile({ budgetDays: 45 })),
+    controller.saveStay({
+      arrivalDate: "2026-08-20",
+      departureDate: "2026-08-22",
+      status: "planned"
+    }),
+    controller.removeStay("existing"),
+    controller.confirmPastPlanned("existing"),
+    controller.clearAll({ confirmed: true }),
+    controller.beginEditProfile(),
+    controller.showDemo()
+  ];
+
+  assert.ok(attempts.every((attempt) => attempt.ok === false));
+  assert.ok(attempts.every((attempt) =>
+    /Bekräfta eller avbryt återställningen först/.test(attempt.message)));
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(repository.calls.clear, 0);
+
+  assert.equal(controller.cancelRestore().ok, true);
+  assert.equal(controller.saveProfile(profile({ budgetDays: 45 })).ok, true);
+});
+
+test("export still works while a session or memory fallback issue is loaded", async (context) => {
+  const fallbacks = [
+    { code: "session-fallback", message: "Data kan försvinna när sidan stängs." },
+    { code: "memory-fallback", message: "Data försvinner när sidan laddas om." }
+  ];
+
+  for (const loadIssue of fallbacks) {
+    await context.test(loadIssue.code, () => {
+      const repository = fakeRepository({
+        state: appState({ stays: [stay("one")] }),
+        loadIssue
+      });
+      const { controller } = setup({ repository });
+      controller.init();
+
+      assert.equal(controller.createBackupDownload().ok, true);
+      assert.equal(controller.createCsvDownload().ok, true);
+      assert.equal(repository.calls.save.length, 0);
+    });
+  }
+});
+
+test("a blocking storage issue rejects preview until a successful clear", () => {
+  const unsupported = {
+    code: "unsupported-version",
+    message: "Den sparade dataversionen stöds inte. Datan har inte skrivits över."
+  };
+  const repository = fakeRepository({ loadIssue: unsupported });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+
+  const blocked = controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.message, /dataversionen stöds inte/);
+  assert.equal(Object.hasOwn(renders.at(-1), "restorePreview"), false);
+  assert.equal(repository.calls.save.length, 0);
+
+  assert.equal(controller.clearAll({ confirmed: true }).ok, true);
+  assert.equal(controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  }).ok, true);
+  assert.equal(controller.confirmRestore({ confirmed: true }).ok, true);
+  assert.equal(repository.calls.save.length, 1);
+});
+
+test("a successful clear discards a pending restore candidate", () => {
+  const repository = fakeRepository({ state: appState({ stays: [stay("one")] }) });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+  controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+  controller.cancelRestore();
+  controller.previewRestore({
+    raw: backupRaw(restorableState()),
+    fileName: "backup.json"
+  });
+  controller.cancelRestore();
+
+  assert.equal(controller.clearAll({ confirmed: true }).ok, true);
+  assert.equal(Object.hasOwn(renders.at(-1), "restorePreview"), false);
+  assert.equal(controller.confirmRestore({ confirmed: true }).ok, false);
 });
