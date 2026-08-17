@@ -25,7 +25,7 @@
 - Reuse: `src/storage.js`
 - Reuse: `src/domain/dates.js`
 
-- [ ] **Step 1: Write the missing-module contract test**
+- [x] **Step 1: Write the missing-module contract test**
 
 Create `test/data-transfer.test.js` with the project test helpers needed to build one valid AppState v1. Start with these contract assertions:
 
@@ -150,7 +150,7 @@ test("empty CSV contains only its stable header", () => {
 });
 ```
 
-- [ ] **Step 2: Run the codec test and verify RED**
+- [x] **Step 2: Run the codec test and verify RED**
 
 Run:
 
@@ -160,7 +160,7 @@ node --test test/data-transfer.test.js
 
 Expected: FAIL because `src/data-transfer.js` and its exports do not exist.
 
-- [ ] **Step 3: Implement the pure transfer module**
+- [x] **Step 3: Implement the pure transfer module**
 
 Create `src/data-transfer.js` with:
 
@@ -238,7 +238,7 @@ export function createStayCsv(state) {
 }
 ```
 
-- [ ] **Step 4: Add immutability, BOM and invalid-state codec tests**
+- [x] **Step 4: Add immutability, BOM and invalid-state codec tests**
 
 Extend `test/data-transfer.test.js` with:
 
@@ -259,7 +259,7 @@ test("transfer codecs reject demos and invalid canonical state", () => {
 });
 ```
 
-- [ ] **Step 5: Run codec and storage tests and verify GREEN**
+- [x] **Step 5: Run codec and storage tests and verify GREEN**
 
 Run:
 
@@ -269,7 +269,7 @@ node --test test/data-transfer.test.js test/storage.test.js test/validation.test
 
 Expected: PASS. `src/storage.js` remains unchanged.
 
-- [ ] **Step 6: Commit the pure codecs**
+- [x] **Step 6: Commit the pure codecs**
 
 Run:
 
