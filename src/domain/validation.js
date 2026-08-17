@@ -168,6 +168,10 @@ export function validateAppState(input) {
     });
   }
 
+  if (profileResult.value === null && stays.length > 0) {
+    return failed({}, "Sparad data utan profil får inte innehålla vistelser.");
+  }
+
   return {
     ok: true,
     value: { version: 1, profile: profileResult.value, stays }

@@ -394,3 +394,24 @@ test("validateAppState rejects duplicate stay ids", () => {
     message: "En sparad vistelse är ogiltig."
   });
 });
+
+test("validateAppState rejects stays without a profile", () => {
+  const result = validateAppState({
+    version: 1,
+    profile: null,
+    stays: [{
+      id: "hidden-stay",
+      arrivalDate: "2026-08-01",
+      departureDate: "2026-08-01",
+      status: "actual",
+      createdAt: "2026-08-01T12:00:00.000Z",
+      updatedAt: "2026-08-01T12:00:00.000Z"
+    }]
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    fieldErrors: {},
+    message: "Sparad data utan profil får inte innehålla vistelser."
+  });
+});

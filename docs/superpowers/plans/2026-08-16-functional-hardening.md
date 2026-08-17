@@ -141,7 +141,7 @@ git commit -m "test: lock source-backed legal scenarios"
 - Modify: `test/budget.test.js`
 - Verify: `src/domain/budget.js`
 
-- [ ] **Step 1: Add the hidden-stay invariant test**
+- [x] **Step 1: Add the hidden-stay invariant test**
 
 Add to `test/validation.test.js` using its existing valid stay fixture shape:
 
@@ -168,7 +168,7 @@ test("validateAppState rejects stays without a profile", () => {
 });
 ```
 
-- [ ] **Step 2: Run the invariant test and verify RED**
+- [x] **Step 2: Run the invariant test and verify RED**
 
 Run:
 
@@ -178,7 +178,7 @@ node --test --test-name-pattern="without a profile" test/validation.test.js
 
 Expected: FAIL because current validation accepts the state.
 
-- [ ] **Step 3: Add the minimal AppState invariant**
+- [x] **Step 3: Add the minimal AppState invariant**
 
 In `validateAppState`, immediately after the root shape guard and before profile normalization, add:
 
@@ -188,7 +188,7 @@ if (input.profile === null && input.stays.length > 0) {
 }
 ```
 
-- [ ] **Step 4: Add missing calculation characterization tests**
+- [x] **Step 4: Add missing calculation characterization tests**
 
 Append to `test/budget.test.js`:
 
@@ -239,7 +239,7 @@ test("budget ranks non-contiguous registered dates chronologically", () => {
 });
 ```
 
-- [ ] **Step 5: Run the focused boundary suite and verify GREEN**
+- [x] **Step 5: Run the focused boundary suite and verify GREEN**
 
 Run:
 
@@ -249,7 +249,7 @@ node --test test/validation.test.js test/dates.test.js test/stays.test.js test/b
 
 Expected: PASS. The new budget cases should characterize existing code; only the state invariant should require production change.
 
-- [ ] **Step 6: Commit the invariant and boundary coverage**
+- [x] **Step 6: Commit the invariant and boundary coverage**
 
 Run:
 

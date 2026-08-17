@@ -121,7 +121,10 @@ test("addStay appends exact metadata without mutating state or input", () => {
   assert.notEqual(result.value, state);
   assert.notEqual(result.value.stays, state.stays);
   assert.notEqual(result.value.stays[0], input);
-  assert.equal(validateAppState(result.value).ok, true);
+  assert.equal(
+    validateAppState({ ...result.value, profile: validProfile }).ok,
+    true
+  );
 });
 
 test("addStay returns validation errors without changing state", () => {

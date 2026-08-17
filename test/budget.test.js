@@ -179,3 +179,48 @@ test("evaluatePlannedStay ranks overlapping candidate dates after period clippin
   assert.equal(result.candidateFirstExceededDate, "2026-08-06");
   assert.equal(result.statusByDate["2026-08-02"], "actual");
 });
+
+test("evaluatePlannedStay reports no candidate boundary outside the period", () => {
+  const result = evaluatePlannedStay(
+    profile({ periodStart: "2026-08-01", periodEnd: "2026-08-31" }),
+    [],
+    {
+      arrivalDate: "2026-09-01",
+      departureDate: "2026-09-03",
+      status: "planned"
+    }
+  );
+
+  assert.equal(result.uniqueDays, 0);
+  assert.equal(result.excludedDays, 3);
+  assert.equal(result.candidateLastWithinBudgetDate, null);
+  assert.equal(result.candidateFirstExceededDate, null);
+});
+
+test("budget ranks non-contiguous registered dates chronologically", () => {
+  const result = calculateBudget(profile({ budgetDays: 2 }), [
+    {
+      arrivalDate: "2026-08-10",
+      departureDate: "2026-08-10",
+      status: "planned"
+    },
+    {
+      arrivalDate: "2026-08-01",
+      departureDate: "2026-08-01",
+      status: "actual"
+    },
+    {
+      arrivalDate: "2026-08-20",
+      departureDate: "2026-08-20",
+      status: "planned"
+    }
+  ]);
+
+  assert.deepEqual(result.registeredDates, [
+    "2026-08-01",
+    "2026-08-10",
+    "2026-08-20"
+  ]);
+  assert.equal(result.lastWithinBudgetDate, "2026-08-10");
+  assert.equal(result.firstExceededDate, "2026-08-20");
+});
