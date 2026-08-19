@@ -128,12 +128,18 @@ export function renderOnboarding({
   })).join("");
 
   return '<section class="onboarding" aria-labelledby="onboarding-title">' +
+    '<div class="onboarding-layout">' +
     '<header class="onboarding-header"><p class="eyebrow">Sverigevistelseplaneraren</p>' +
     '<h1 id="onboarding-title">' +
     (editing ? "Ändra din plan" : "Planera Sverigedagar med tydliga antaganden") +
     "</h1>" +
     '<p class="disclaimer">Planeringsverktyg, inte juridisk rådgivning. ' +
-    "Ett grönt budgetläge är inte ett juridiskt besked.</p></header>" +
+    "Ett grönt budgetläge är inte ett juridiskt besked.</p>" +
+    '<ul class="onboarding-points" aria-hidden="true">' +
+    "<li>Räkna faktiska och planerade dagar separat</li>" +
+    "<li>Din budget är ett eget tak, inte ett lagkrav</li>" +
+    "<li>Allt sparas lokalt i din webbläsare</li>" +
+    "</ul></header>" +
     '<div class="onboarding-body">' + storageBanner + storageClear + errorSummary +
     '<form data-form="profile" novalidate>' +
     '<div class="field"><label for="departureDate">Utflyttningsdatum</label>' +
@@ -183,7 +189,7 @@ export function renderOnboarding({
       ? ""
       : '<button class="text-button" type="button" data-action="show-demo">Visa syntetiskt demoexempel</button>') +
     renderDataTools({ restorePreview, canExport }) +
-    "</div></section>";
+    "</div></div></section>";
 }
 
 export function readProfileForm(form) {

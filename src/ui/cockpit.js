@@ -276,14 +276,14 @@ function renderBudgetStatus(model) {
 
 function renderHeader(model) {
   const actions = model.demo
-    ? '<button class="secondary-button secondary-button--inverse" type="button" ' +
+    ? '<button class="secondary-button" type="button" ' +
       'data-action="exit-demo">Tillbaka till min plan</button>'
-    : '<button class="secondary-button secondary-button--inverse" type="button" ' +
+    : '<button class="secondary-button" type="button" ' +
       'data-action="edit-profile">Inställningar</button>' +
       '<button class="primary-button" type="button" data-action="add-stay">' +
       "Lägg till vistelse</button>";
 
-  return '<header class="app-header"><div><p class="eyebrow">' +
+  return '<header class="app-header"><div class="app-header__copy"><p class="eyebrow">' +
     "Sverigevistelseplaneraren</p><h1>Din Sverigeöversikt</h1>" +
     '<p class="app-header__disclaimer">Planeringsverktyg, inte juridisk rådgivning.</p>' +
     '</div><div class="header-actions">' + actions + "</div></header>";
@@ -326,9 +326,11 @@ export function renderCockpit(model) {
         "Rensa all data</button>") + "</footer>";
 
   return '<div class="cockpit-shell">' + demoBanner + storageBanner +
-    renderHeader(model) + '<div class="cockpit-content">' + renderSummary(model) +
+    renderHeader(model) + '<div class="cockpit-content">' +
+    '<section class="cockpit-hero">' + renderSummary(model) +
     renderBudgetStatus(model) +
     renderBudgetExplanation(model.explanation) +
+    "</section>" +
     '<div class="legend" aria-label="Kalenderförklaring">' +
     '<span class="legend__item legend--actual"><i aria-hidden="true"></i>Faktisk</span>' +
     '<span class="legend__item legend--planned"><i aria-hidden="true"></i>Planerad</span>' +
