@@ -19,7 +19,8 @@ const {
   closeStayDialog,
   openStayDialog,
   readStayForm,
-  renderStayDialog
+  renderStayDialog,
+  updateStayPreview
 } = stayDialogModule;
 const { createBrowserApp } = mainModule;
 
@@ -39,7 +40,7 @@ test("renderOnboarding explains its scope and labels the required profile fields
   assert.match(html, /<label for="periodStart">Period från<\/label>/);
   assert.match(html, /<label for="periodEnd">Period till<\/label>/);
   assert.match(html, /data-action="show-demo"/);
-  assert.match(html, /Visa syntetiskt demoexempel/);
+  assert.match(html, /Prova med exempel/);
 });
 
 test("renderOnboarding includes every voluntary legal observation question", () => {
@@ -53,6 +54,11 @@ test("renderOnboarding includes every voluntary legal observation question", () 
     assert.match(html, new RegExp('name="connectionChecklist\\.' + key + '"'));
   }
   assert.equal((html.match(/Vill inte svara nu/g) ?? []).length, CHECKLIST_KEYS.length + 2);
+});
+
+test("onboarding exposes local storage guidance to assistive technology", () => {
+  const html = render();
+  assert.match(html, /<ul class="onboarding-points">[\s\S]*Allt sparas lokalt i din webbläsare/);
 });
 
 test("renderOnboarding associates input and tri-state errors with their fields", () => {
@@ -575,7 +581,7 @@ test("cockpit CSS keeps calendar responsive and status markers non-colour-only",
   assert.match(css, /\.month-card table\s*\{[^}]*min-width:\s*19\.25rem/s);
   assert.match(
     css,
-    /@media \(max-width:\s*90rem\)\s*\{[^}]*\.cockpit-layout\s*\{[^}]*grid-template-columns:\s*1fr/s
+    /@media \(max-width:\s*61\.25rem\)\s*\{[^}]*\.cockpit-layout\s*\{[^}]*grid-template-columns:\s*1fr/s
   );
   assert.match(css, /\.stay-row--planned/);
   assert.match(css, /\.observation a\s*\{[^}]*min-height:\s*2\.75rem/s);
@@ -808,6 +814,7 @@ function fakeBrowserDocument() {
   };
   const arrival = { focus() {}, isConnected: true };
   const dialog = new FakeEventRoot();
+  dialog.preview = { innerHTML: "", querySelector: () => null };
   dialog.open = false;
   dialog.showModal = function showModal() {
     this.open = true;
@@ -815,7 +822,8 @@ function fakeBrowserDocument() {
   dialog.close = function close() {
     this.open = false;
   };
-  dialog.querySelector = (selector) => selector.includes("arrivalDate") ? arrival : null;
+  dialog.querySelector = (selector) => selector === ".stay-preview-slot"
+    ? dialog.preview : selector.includes("arrivalDate") ? arrival : null;
   const liveRegion = { textContent: "" };
   const nodes = {
     "#app": app,
@@ -1140,7 +1148,7 @@ test("main announces an unreadable file without exposing the caught error", asyn
 test("main can restore from onboarding and never saves before confirmation", async () => {
   const { app, repository } = createTestBrowserApp(null);
 
-  assert.match(app.innerHTML, /Planera Sverigedagar/);
+  assert.match(app.innerHTML, /Håll koll på dina dagar i Sverige/);
   assert.match(app.innerHTML, /data-action="choose-restore"/);
   assert.doesNotMatch(app.innerHTML, /data-action="download-backup"/);
 
@@ -1176,8 +1184,8 @@ test("main confirm-restore saves once, replaces state and resets the view year",
   assert.deepEqual(repository.calls.save[0], restorableAppState());
   assert.deepEqual(api.controller.getSnapshot().state, restorableAppState());
   assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
-  assert.match(app.innerHTML, /data-action="next-year" aria-label="Nästa år"/);
-  assert.match(app.innerHTML, /<h2>2027<\/h2>/);
+  assert.match(app.innerHTML, /data-action="next-month" aria-label="Nästa månad"/);
+  assert.match(app.innerHTML, /<h2>Januari 2027<\/h2>/);
   assert.ok(app.focusedSelectors.includes('[data-action="choose-restore"]'));
 });
 
@@ -1249,6 +1257,9 @@ test("main refuses to open the stay dialog while a restore is pending", async ()
   const openers = [
     actionTarget("add-stay"),
     actionTarget("select-date", { date: "2026-08-20" }),
+    actionTarget("select-date", { date: "2026-08-01" }),
+    actionTarget("select-date", { date: "2026-08-02" }),
+    actionTarget("cancel-planned", { stayId: "planned-august" }),
     actionTarget("edit-stay", { stayId: "actual-august" })
   ];
 
@@ -1377,6 +1388,27 @@ test("main reopens an invalid stay with field-linked errors", () => {
   assert.match(dialog.innerHTML, /Avresedatum måste vara samma dag eller senare/);
 });
 
+test("main preserves date and status controls when refreshing the preview", () => {
+  for (const name of ["arrivalDate", "departureDate", "status"]) {
+    const { app, dialog } = createTestBrowserApp();
+    app.dispatch("click", { target: actionTarget("add-stay") });
+    const initialHtml = dialog.innerHTML;
+    let fullRenders = 0;
+    Object.defineProperty(dialog, "innerHTML", {
+      get: () => initialHtml,
+      set: () => { fullRenders += 1; }
+    });
+    const form = stayForm({
+      arrivalDate: "2026-08-10", departureDate: "2026-08-14", status: "planned"
+    });
+    withFormData(() => dialog.dispatch("change", {
+      target: { name, closest: () => form }
+    }));
+    assert.equal(fullRenders, 0, name + " must retain its native control and focus");
+    assert.match(dialog.preview.innerHTML, /Efter vistelsen/);
+  }
+});
+
 test("main update preview excludes the old interval", () => {
   const state = cockpitState({
     profile: { budgetDays: 5 },
@@ -1403,8 +1435,62 @@ test("main update preview excludes the old interval", () => {
     target: { name: "departureDate", closest: () => form }
   }));
 
-  assert.match(dialog.innerHTML, /5 \/ 5 registrerade dagar/);
-  assert.doesNotMatch(dialog.innerHTML, /10 \/ 5 registrerade dagar/);
+  assert.match(dialog.preview.innerHTML, /5 \/ 5 registrerade dagar/);
+  assert.doesNotMatch(dialog.preview.innerHTML, /10 \/ 5 registrerade dagar/);
+});
+
+test("preview updates preserve the expanded calculation and clear stale errors", () => {
+  let details = { open: true };
+  const removed = [];
+  let previewHtml = "";
+  const preview = {
+    get innerHTML() { return previewHtml; },
+    set innerHTML(html) {
+      previewHtml = html;
+      details = html ? { open: false } : null;
+    },
+    querySelector: () => details
+  };
+  const dialog = {
+    querySelector: () => preview,
+    querySelectorAll: (selector) => selector.includes("aria-invalid")
+      ? [{ removeAttribute: (name) => removed.push(name) }]
+      : [{ remove: () => removed.push("error-message") }]
+  };
+  assert.equal(typeof updateStayPreview, "function");
+  updateStayPreview(dialog, stayDialogModel().preview);
+  assert.equal(details.open, true);
+  assert.match(preview.innerHTML, /Efter vistelsen/);
+  assert.ok(removed.includes("aria-invalid"));
+  assert.ok(removed.includes("aria-describedby"));
+  assert.ok(removed.includes("error-message"));
+  updateStayPreview(dialog, null);
+  assert.equal(preview.innerHTML, "");
+});
+
+test("stay validation focuses the invalid departure rather than the valid arrival", () => {
+  const { app, dialog } = createTestBrowserApp();
+  app.dispatch("click", { target: actionTarget("add-stay") });
+  let focused;
+  dialog.querySelector = (selector) => selector.includes("aria-invalid")
+    ? { focus() { focused = "departureDate"; } }
+    : { focus() { focused = "arrivalDate"; } };
+  withFormData(() => dialog.dispatch("submit", {
+    target: stayForm({ arrivalDate: "2026-08-10", departureDate: "2026-08-09", status: "planned" }),
+    preventDefault() {}
+  }));
+  assert.equal(focused, "departureDate");
+});
+
+test("profile validation focuses the first invalid input", () => {
+  const { app } = createTestBrowserApp();
+  app.dispatch("click", { target: actionTarget("edit-profile") });
+  app.focusedSelectors.length = 0;
+  withFormData(() => app.dispatch("submit", {
+    target: profileForm({ departureDate: "2025-01-01", budgetDays: "", periodStart: "2026-01-01", periodEnd: "2026-12-31" }),
+    preventDefault() {}
+  }));
+  assert.ok(app.focusedSelectors.some((selector) => selector.includes("aria-invalid")));
 });
 
 test("main requires inline delete confirmation before removing a stay", () => {
@@ -1488,7 +1574,7 @@ test("main clears only after inline confirmation and cancel leaves state untouch
   app.dispatch("click", { target: actionTarget("request-clear") });
   app.dispatch("click", { target: actionTarget("confirm-clear") });
   assert.equal(repository.calls.clear, 1);
-  assert.match(app.innerHTML, /Planera Sverigedagar/);
+  assert.match(app.innerHTML, /Håll koll på dina dagar i Sverige/);
 });
 
 test("main blocks unsupported storage saves and keeps failed clear retry visible", () => {
@@ -1554,6 +1640,87 @@ test("main moves roving calendar focus across year boundaries and opens with Ent
   assert.equal(prevented, 5);
 });
 
+test("calendar opens a registered stay for editing without writing", () => {
+  const { app, dialog, repository } = createTestBrowserApp();
+  app.dispatch("click", {
+    target: actionTarget("select-date", { date: "2026-08-01" })
+  });
+  assert.match(dialog.innerHTML, /Redigera vistelse/);
+  assert.match(dialog.innerHTML, /name="departureDate"[^>]*value="2026-08-02"/);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("overlapping calendar stays require a choice and preserve the selected id", () => {
+  const { app, dialog, repository } = createTestBrowserApp();
+  app.dispatch("keydown", {
+    key: "Enter",
+    target: actionTarget("select-date", { date: "2026-08-02" }),
+    preventDefault() {}
+  });
+  assert.match(dialog.innerHTML, /data-action="choose-stay" data-stay-id="actual-august"/);
+  assert.match(dialog.innerHTML, /data-action="choose-stay" data-stay-id="planned-august"/);
+  assert.doesNotMatch(dialog.innerHTML, /data-form="stay"/);
+  dialog.dispatch("click", {
+    target: actionTarget("choose-stay", { stayId: "planned-august" })
+  });
+  assert.match(dialog.innerHTML, /Redigera vistelse/);
+  withFormData(() => dialog.dispatch("submit", {
+    target: stayForm({ arrivalDate: "2026-08-02", departureDate: "2026-08-05", status: "planned" }),
+    preventDefault() {}
+  }));
+  assert.equal(repository.calls.save[0].stays.length, 2);
+  assert.equal(repository.calls.save[0].stays[1].id, "planned-august");
+  assert.equal(repository.calls.save[0].stays[1].departureDate, "2026-08-05");
+});
+
+test("overlap chooser can explicitly create another stay on the selected date", () => {
+  const { app, dialog, repository } = createTestBrowserApp();
+  app.dispatch("click", { target: actionTarget("select-date", { date: "2026-08-02" }) });
+  assert.match(dialog.innerHTML, /Välj vistelse/);
+  dialog.dispatch("click", { target: actionTarget("new-stay-on-date") });
+  assert.match(dialog.innerHTML, /Lägg till vistelse/);
+  assert.match(dialog.innerHTML, /name="arrivalDate"[^>]*value="2026-08-02"/);
+  assert.doesNotMatch(dialog.innerHTML, /data-action="choose-stay"/);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("a cancelled trip requires confirmation before removal", () => {
+  const { app, dialog, repository } = createTestBrowserApp();
+  let confirmationFocused = false;
+  dialog.querySelector = (selector) => selector === '[data-action="cancel-delete"]'
+    ? { focus() { confirmationFocused = true; } } : null;
+  app.dispatch("click", { target: actionTarget("cancel-planned", { stayId: "planned-august" }) });
+  assert.equal(dialog.open, true);
+  assert.match(dialog.innerHTML, /data-action="confirm-delete"/);
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(confirmationFocused, true);
+  dialog.dispatch("click", { target: actionTarget("cancel-delete") });
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("month navigation crosses years without changing the budget period or data", () => {
+  const { app, repository } = createTestBrowserApp();
+  assert.match(app.innerHTML, /<h2>Augusti 2026<\/h2>/);
+  assert.equal((app.innerHTML.match(/<table aria-labelledby="month-/g) ?? []).length, 1);
+  for (let index = 0; index < 5; index += 1) {
+    app.dispatch("click", { target: actionTarget("next-month") });
+  }
+  assert.match(app.innerHTML, /<h2>Januari 2027<\/h2>/);
+  assert.match(app.innerHTML, /Budgetperiod: 1 januari 2026/);
+  assert.equal(repository.calls.save.length, 0);
+  app.dispatch("click", { target: actionTarget("toggle-calendar") });
+  assert.equal((app.innerHTML.match(/<table aria-labelledby="month-/g) ?? []).length, 12);
+  assert.match(app.innerHTML, /data-action="previous-year"/);
+});
+
+test("overview puts actionable stays before the calendar and exposes local storage", () => {
+  const html = renderCockpit(buildCockpitModel(cockpitState(), { today: "2026-08-16" }));
+  assert.ok(html.indexOf('<h2>Vistelser</h2>') < html.indexOf('class="calendar-panel"'));
+  assert.match(html, /Sparas i den här webbläsaren/);
+  assert.match(html, /href="#data-tools-heading"/);
+  assert.match(html, /data-action="cancel-planned"/);
+});
+
 test("main tolerates denied storage and crypto getters without console fallback", () => {
   assert.equal(typeof createBrowserApp, "function", "createBrowserApp ska exporteras");
   const browser = fakeBrowserDocument();
@@ -1570,5 +1737,5 @@ test("main tolerates denied storage and crypto getters without console fallback"
     today: "2026-08-16",
     now: () => "2026-08-16T12:00:00.000Z"
   }));
-  assert.match(browser.app.innerHTML, /Planera Sverigedagar/);
+  assert.match(browser.app.innerHTML, /Håll koll på dina dagar i Sverige/);
 });

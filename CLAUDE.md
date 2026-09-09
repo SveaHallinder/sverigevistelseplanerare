@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build a functionally trustworthy Sweden-stay planner for people who have already moved abroad. Preserve the existing local-first MVP, harden date/legal calculations, then add safe local backup/restore and deterministic CSV export. Visual redesign is explicitly deferred.
+Build a functionally trustworthy Sweden-stay planner for people who have already moved abroad. Preserve the existing local-first MVP, hardened calculations and safe backup/restore. The local launch UX improvements approved on 2026-09-07 are implemented; follow the current handoff for remaining QA.
 
 This is a planning tool, not legal advice. It must never declare tax residence, tax liability, legal safety, or a date when someone "must leave Sweden".
 
@@ -58,7 +58,7 @@ The old MVP implementation plan is intentionally preserved as history. Its unche
 - Unregistered dates mean only "not registered", never proven foreign presence.
 - Official legal sources and `reviewedAt` remain visible for every legal observation.
 - Local-first only. No account, backend, database, telemetry, analytics, AI advice, cloud sync or reminders in these two plans.
-- No visual redesign. Add only compact functional controls and disclosures using existing components.
+- Preserve the current visual foundation. Local launch scope includes month/year navigation, accessible stay editing, mobile content order and clearer onboarding. Keep changes small and use existing components.
 
 ## Engineering rules
 

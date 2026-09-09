@@ -1,8 +1,18 @@
 # Current handoff
 
-Updated: 2026-08-17
+Updated: 2026-09-07
 
 ## Current state
+
+The approved local launch UX is implemented on `design/apple-esque-makeover`, with no dependency, storage schema or legal calculation changes. Month view opens on the budget period (or today within it); year view is optional. Registered days open an editor or an overlap chooser. Mobile shows stays before the calendar. Onboarding requires an actively chosen budget; previews explain new unique days, overlap and excluded dates. Local storage and backup are visible in the overview.
+
+The follow-up UI polish gives remaining/over-budget days visual priority, keeps three compact summary counts, moves registered boundary dates into the calculation disclosure, and increases muted text contrast. Stay previews show the balance and excluded-date notice immediately, with arithmetic under a disclosure. The form scrolls independently of its save footer; changing status restores focus to the checked radio.
+
+The final interaction pass fixes native date segment focus: changing a month no longer replaces the input and moves editing to its year segment. Only the preview updates, preserving expanded calculation details. Validation focuses the first invalid input. Local-storage onboarding guidance is available to assistive technology and remains visible on mobile; validation text has higher contrast.
+
+Current checks: `npm run check` passes lint, 358 tests and build. Chrome localhost checks cover onboarding, demo, overlap editing, confirmation cancellation, persistence, calendar navigation and responsive layout. The polished overview has no horizontal overflow at 320–1600 px; the save footer remains visible at 667×375 with expanded calculation details. The built copy on port 4174 has also passed onboarding, budget validation, empty state and actual/planned overlap registration. See `docs/qa/localhost.md` for precise results, the five-task usability script and remaining manual checks. No real participant usability test has been performed. Safari WebDriver rejects session creation until Safari Settings → Developer → Allow remote automation is enabled; the user has been asked to enable it. Safari/Firefox, real iPhone, automated file selection and two official legal sources remain unverified.
+
+## Historical sprint state (2026-08-17)
 
 Both sprint plans are implemented, verified and committed locally on branch `claude/functional-hardening-export`. The local-first MVP now also explains its own arithmetic and supports local JSON backup/restore plus deterministic CSV export. No dependency, backend, cloud, analytics, persisted schema change or visual redesign was introduced.
 
@@ -15,7 +25,7 @@ Verification from the final tree:
 - storage modes: local, session and memory behavior remain covered by tests
 - a forced post-write storage conflict was reproduced in a real browser and the persisted layers genuinely diverged, matching the partial-write warning copy
 
-The current UI is intentionally not the next priority. Keep its structure and styles unless a new functional control needs the smallest possible addition.
+The earlier UI deferral was superseded by the user's approved local launch plan on 2026-09-07. Preserve the new structure and styles unless a concrete issue requires a small fix.
 
 ## Product in one paragraph
 
@@ -84,12 +94,12 @@ Two smaller judgement calls: the disclosure uses `min-height: 2.75rem` instead o
 
 ## Remaining product roadmap
 
-Not started, in this order:
+Remaining, in this order:
 
-1. Account and cloud sync, including any real multi-device conflict resolution. Web Storage limits documented below are the reason this cannot be faked locally.
-2. Visual redesign, last.
+1. Complete the browser/file QA and source verification documented in `docs/qa/localhost.md`, then try the local beta with users.
+2. Account and cloud sync only after a separate product decision. Web Storage limits documented below are the reason multi-device synchronization cannot be faked locally.
 
-Neither is in scope for the two completed plans. Nothing here is deployed and no legal review has been performed.
+Nothing here is deployed and no external legal review has been performed. The local UI work does not authorize new backend infrastructure.
 
 ## Locked decisions, now implemented and covered by tests
 

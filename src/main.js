@@ -1,14 +1,15 @@
 import { createAppController } from "./controller.js";
 import { MAX_IMPORT_BYTES } from "./data-transfer.js";
 import { evaluatePlannedStay } from "./domain/budget.js";
-import { addDays, isIsoDate, todayLocalIso } from "./domain/dates.js";
+import { addDays, addMonthsClamped, isIsoDate, todayLocalIso } from "./domain/dates.js";
 import { createStateRepository } from "./storage.js";
 import { buildCockpitModel, renderCockpit } from "./ui/cockpit.js";
 import { readProfileForm, renderOnboarding } from "./ui/onboarding.js";
 import {
   closeStayDialog,
   openStayDialog,
-  readStayForm
+  readStayForm,
+  updateStayPreview
 } from "./ui/stay-dialog.js";
 
 function safeWindowValue(windowRef, key) {
@@ -86,6 +87,7 @@ export function createBrowserApp(options = {}) {
   let published = null;
   let viewYear = yearFromDate(today);
   let focusedDate = today;
+  let calendarView = "month";
   let currentDialog = null;
   let clearRequested = false;
 
@@ -112,6 +114,7 @@ export function createBrowserApp(options = {}) {
         today: published.today,
         year: viewYear,
         focusedDate,
+        calendarView,
         storageIssue: published.storageIssue,
         clearRequested,
         demo: published.demo,
@@ -135,13 +138,19 @@ export function createBrowserApp(options = {}) {
   }
 
   function receivePublished(nextPublished) {
-    const hadProfile = Boolean(published?.state?.profile);
+    const previousProfile = published?.state?.profile;
     published = nextPublished;
-    if (!hadProfile && published.state?.profile) {
-      viewYear = yearFromDate(published.state.profile.periodStart);
-      focusedDate = yearFromDate(today) === viewYear
-        ? today
-        : published.state.profile.periodStart;
+    const profile = published.state?.profile;
+    if (profile && (!previousProfile || profile.periodStart !== previousProfile.periodStart
+      || profile.periodEnd !== previousProfile.periodEnd)) {
+      focusedDate = today >= profile.periodStart && today <= profile.periodEnd
+        ? today : profile.periodStart;
+      viewYear = yearFromDate(focusedDate);
+      calendarView = "month";
+    }
+    if (published.demo && !previousProfile && published.state.stays.length > 0) {
+      focusedDate = published.state.stays[0].arrivalDate;
+      viewYear = yearFromDate(focusedDate);
     }
     renderPublished();
   }
@@ -178,21 +187,22 @@ export function createBrowserApp(options = {}) {
       fieldErrors: currentDialog.fieldErrors,
       message: currentDialog.message,
       preview: dialogPreview(currentDialog.values, currentDialog.id),
-      deleteRequested: currentDialog.deleteRequested
+      deleteRequested: currentDialog.deleteRequested,
+      choices: currentDialog.choices
     };
   }
 
-  function renderCurrentDialog(focusName = null) {
+  function renderCurrentDialog() {
     if (!currentDialog) {
       return;
     }
     openStayDialog(dialog, currentDialogModel(), currentDialog.returnFocusElement);
-    if (["arrivalDate", "departureDate", "status"].includes(focusName)) {
-      dialog.querySelector?.('[name="' + focusName + '"]')?.focus?.();
+    if (currentDialog.deleteRequested) {
+      dialog.querySelector?.('[data-action="cancel-delete"]')?.focus?.();
     }
   }
 
-  function openStay({ id = null, values, returnFocusElement }) {
+  function openStay({ id = null, values, returnFocusElement, choices = [], deleteRequested = false }) {
     if (blockedByPendingRestore()) {
       return;
     }
@@ -201,7 +211,8 @@ export function createBrowserApp(options = {}) {
       values,
       fieldErrors: {},
       message: "",
-      deleteRequested: false,
+      deleteRequested,
+      choices,
       returnFocusElement
     };
     renderCurrentDialog();
@@ -228,7 +239,7 @@ export function createBrowserApp(options = {}) {
     });
   }
 
-  function openExistingStay(id, returnFocusElement) {
+  function openExistingStay(id, returnFocusElement, deleteRequested = false) {
     const current = controller.getSnapshot().state?.stays.find((stay) => stay.id === id);
     if (!current) {
       announce("Vistelsen kunde inte hittas.");
@@ -241,8 +252,28 @@ export function createBrowserApp(options = {}) {
         departureDate: current.departureDate,
         status: current.status
       },
-      returnFocusElement
+      returnFocusElement,
+      deleteRequested
     });
+  }
+
+  function openCalendarDate(date, returnFocusElement) {
+    if (blockedByPendingRestore() || published?.demo || !isIsoDate(date)) return;
+    focusedDate = date;
+    viewYear = yearFromDate(date);
+    const choices = controller.getSnapshot().state?.stays.filter((stay) =>
+      stay.arrivalDate <= date && stay.departureDate >= date) ?? [];
+    if (choices.length === 1) {
+      openExistingStay(choices[0].id, returnFocusElement);
+    } else if (choices.length > 1) {
+      openStay({
+        choices,
+        values: { arrivalDate: date, departureDate: date, status: "planned" },
+        returnFocusElement
+      });
+    } else {
+      openNewStay(date, returnFocusElement);
+    }
   }
 
   function focusCalendar(date) {
@@ -250,11 +281,23 @@ export function createBrowserApp(options = {}) {
   }
 
   function changeYear(offset) {
-    const nextYear = Math.max(1, Math.min(9999, viewYear + offset));
+    const nextYear = Math.max(100, Math.min(9999, viewYear + offset));
     viewYear = nextYear;
     focusedDate = String(nextYear).padStart(4, "0") + "-01-01";
     renderPublished();
     focusCalendar(focusedDate);
+  }
+
+  function changeMonth(offset) {
+    const nextDate = addMonthsClamped(focusedDate.slice(0, 7) + "-01", offset);
+    if (!isIsoDate(nextDate)) return;
+    focusedDate = nextDate;
+    viewYear = yearFromDate(nextDate);
+    renderPublished();
+    app.querySelector?.('[data-action="' + (offset < 0 ? "previous-month" : "next-month") + '"]')?.focus?.();
+    announce(new Intl.DateTimeFormat("sv-SE", {
+      month: "long", year: "numeric", timeZone: "UTC"
+    }).format(new Date(nextDate + "T00:00:00Z")));
   }
 
   app.addEventListener("submit", (event) => {
@@ -266,6 +309,10 @@ export function createBrowserApp(options = {}) {
     const saved = controller.saveProfile(input);
     if (!saved.ok) {
       renderPublished({ profile: input, fieldErrors: saved.fieldErrors });
+      const invalidInput = app.querySelector?.('input[aria-invalid="true"]');
+      const collapsedQuestions = invalidInput?.closest?.("details");
+      if (collapsedQuestions) collapsedQuestions.open = true;
+      invalidInput?.focus?.();
       announce(saved.message);
       return;
     }
@@ -280,14 +327,20 @@ export function createBrowserApp(options = {}) {
     const action = target.dataset.action;
     if (action === "previous-year" || action === "next-year") {
       changeYear(action === "previous-year" ? -1 : 1);
+    } else if (action === "previous-month" || action === "next-month") {
+      changeMonth(action === "previous-month" ? -1 : 1);
+    } else if (action === "toggle-calendar") {
+      calendarView = calendarView === "month" ? "year" : "month";
+      renderPublished();
+      app.querySelector?.('[data-action="toggle-calendar"]')?.focus?.();
     } else if (action === "add-stay") {
       openNewStay(today, target);
     } else if (action === "select-date") {
-      focusedDate = target.dataset.date;
-      viewYear = yearFromDate(focusedDate);
-      openNewStay(focusedDate, target);
+      openCalendarDate(target.dataset.date, target);
     } else if (action === "edit-stay") {
       openExistingStay(target.dataset.stayId, target);
+    } else if (action === "cancel-planned") {
+      openExistingStay(target.dataset.stayId, target, true);
     } else if (action === "confirm-actual") {
       const result = controller.confirmPastPlanned(target.dataset.stayId);
       announce(result.message);
@@ -337,10 +390,10 @@ export function createBrowserApp(options = {}) {
       }
       const restored = controller.getSnapshot().state;
       if (restored?.profile) {
-        viewYear = yearFromDate(restored.profile.periodStart);
-        focusedDate = yearFromDate(today) === viewYear
-          ? today
-          : restored.profile.periodStart;
+        focusedDate = today >= restored.profile.periodStart && today <= restored.profile.periodEnd
+          ? today : restored.profile.periodStart;
+        viewYear = yearFromDate(focusedDate);
+        calendarView = "month";
         renderPublished();
       }
       (app.querySelector?.('[data-action="choose-restore"]') ?? app)?.focus?.();
@@ -386,9 +439,7 @@ export function createBrowserApp(options = {}) {
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      focusedDate = target.dataset.date;
-      viewYear = yearFromDate(focusedDate);
-      openNewStay(focusedDate, target);
+      openCalendarDate(target.dataset.date, target);
       return;
     }
     const offsets = {
@@ -403,6 +454,7 @@ export function createBrowserApp(options = {}) {
     }
     event.preventDefault();
     const nextDate = addDays(target.dataset.date, offset);
+    if (!isIsoDate(nextDate)) return;
     focusedDate = nextDate;
     viewYear = yearFromDate(nextDate);
     renderPublished();
@@ -443,7 +495,7 @@ export function createBrowserApp(options = {}) {
     currentDialog.values = readStayForm(form);
     currentDialog.fieldErrors = {};
     currentDialog.message = "";
-    renderCurrentDialog(event.target.name);
+    updateStayPreview(dialog, dialogPreview(currentDialog.values, currentDialog.id));
   });
 
   dialog.addEventListener("click", (event) => {
@@ -454,6 +506,11 @@ export function createBrowserApp(options = {}) {
     const action = target.dataset.action;
     if (action === "cancel-stay") {
       closeCurrentDialog();
+    } else if (action === "choose-stay") {
+      if (!currentDialog.choices.some((stay) => stay.id === target.dataset.stayId)) return;
+      openExistingStay(target.dataset.stayId, currentDialog.returnFocusElement);
+    } else if (action === "new-stay-on-date") {
+      openNewStay(currentDialog.values.arrivalDate, currentDialog.returnFocusElement);
     } else if (action === "request-delete") {
       currentDialog.deleteRequested = true;
       renderCurrentDialog();

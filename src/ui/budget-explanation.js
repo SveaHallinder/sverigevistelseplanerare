@@ -88,6 +88,14 @@ export function renderBudgetExplanation(model) {
     + escapeHtml(model.totals.overlapDays) + "</dd></div></dl>"
     + "<p><strong>Budgetformel:</strong> " + escapeHtml(formula)
     + ". " + escapeHtml(balance) + "</p>"
+    + (model.boundary.lastWithinBudgetDate
+      ? "<p>Senaste registrerade dag inom budget: "
+        + escapeHtml(formatDate(model.boundary.lastWithinBudgetDate)) + "</p>"
+      : "<p>Ingen budgetgräns nås av den registrerade planen.</p>")
+    + (model.boundary.firstExceededDate
+      ? "<p>Första registrerade dag över budget: "
+        + escapeHtml(formatDate(model.boundary.firstExceededDate)) + "</p>"
+      : "")
     + renderRanges(
       "Registrerade intervall i budgetperioden",
       model.includedRanges,

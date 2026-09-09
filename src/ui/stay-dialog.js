@@ -32,6 +32,13 @@ function dayWord(count) {
   return Math.abs(count) === 1 ? "dag" : "dagar";
 }
 
+function formatDate(value) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    dateStyle: "long",
+    timeZone: "UTC"
+  }).format(new Date(value + "T00:00:00Z"));
+}
+
 function renderPreview(preview) {
   if (!preview) {
     return "";
@@ -39,22 +46,43 @@ function renderPreview(preview) {
 
   const boundary = preview.candidateFirstExceededDate
     ? "<p>Första dagen i vistelsen över budget är " +
-      escapeHtml(preview.candidateFirstExceededDate) + ".</p>"
+      escapeHtml(formatDate(preview.candidateFirstExceededDate)) + ".</p>"
     : preview.candidateLastWithinBudgetDate
       ? "<p>Vistelsen ryms inom budget till och med " +
-        escapeHtml(preview.candidateLastWithinBudgetDate) + ".</p>"
+        escapeHtml(formatDate(preview.candidateLastWithinBudgetDate)) + ".</p>"
       : "<p>Vistelsen har inga datum inom budgetperioden.</p>";
   const remaining = preview.remaining >= 0
     ? escapeHtml(preview.remaining) + " " + dayWord(preview.remaining) +
       " kvar i din personliga budget."
     : escapeHtml(Math.abs(preview.remaining)) +
       " " + dayWord(preview.remaining) + " över din personliga budget.";
+  const contribution = Number.isInteger(preview.candidateDays)
+    ? "<p>Vistelsen är " + escapeHtml(preview.candidateDays) + " " +
+      dayWord(preview.candidateDays) + " inklusive ankomst och avresa. Den tillför " +
+      escapeHtml(preview.candidateNewDays) +
+      (preview.candidateNewDays === 1 ? " ny unik dag" : " nya unika dagar") +
+      " inom budgetperioden.</p>" +
+      (preview.candidateOverlapDays > 0
+        ? "<p>" + escapeHtml(preview.candidateOverlapDays) + " " +
+          dayWord(preview.candidateOverlapDays) +
+          " överlappar andra vistelser och räknas bara en gång i budgeten.</p>"
+        : "")
+    : "";
+  const outside = preview.candidateDaysOutsidePeriod > 0
+    ? '<p class="stay-preview__notice">' + escapeHtml(preview.candidateDaysOutsidePeriod) + " " +
+      dayWord(preview.candidateDaysOutsidePeriod) +
+      " ligger utanför budgetperioden och påverkar inte denna budget.</p>"
+    : "";
 
-  return '<aside class="stay-preview" aria-labelledby="stay-preview-title">' +
-    '<h3 id="stay-preview-title">Efter vistelsen</h3><p><strong>' +
+  return '<aside class="stay-preview' + (preview.remaining < 0 ? " stay-preview--over" : "") +
+    '" aria-labelledby="stay-preview-title">' +
+    '<h3 id="stay-preview-title">Efter vistelsen</h3><p class="stay-preview__balance">' +
+    remaining + "</p>" + outside +
+    '<details class="stay-preview__details"><summary>Visa beräkning</summary>' + contribution + '<p><strong>' +
     escapeHtml(preview.uniqueDays) + " / " + escapeHtml(preview.budgetDays) +
-    " registrerade dagar</strong></p><p>" + remaining + "</p>" + boundary +
-    "</aside>";
+    " registrerade dagar</strong></p>" + boundary +
+    '<p class="field-hint">Din personliga budget är ett planeringstak, inte ett juridiskt besked.</p>' +
+    "</details></aside>";
 }
 
 function renderDelete(model) {
@@ -74,6 +102,22 @@ function renderDelete(model) {
 }
 
 export function renderStayDialog(model) {
+  if (model.choices?.length) {
+    const choices = model.choices.map((stay) =>
+      '<button class="secondary-button" type="button" data-action="choose-stay" ' +
+      'data-stay-id="' + escapeHtml(stay.id) + '">' +
+      escapeHtml(formatDate(stay.arrivalDate)) + "–" +
+      escapeHtml(formatDate(stay.departureDate)) + " · " +
+      (stay.status === "actual" ? "Faktisk" : "Planerad") + "</button>"
+    ).join("");
+    return '<section class="stay-dialog"><header><h2 id="stay-dialog-title">Välj vistelse</h2>' +
+      '<button class="dialog-close" type="button" data-action="cancel-stay" ' +
+      'aria-label="Stäng">&times;</button></header>' +
+      "<p>Flera vistelser finns på den här dagen. Vilken vill du redigera?</p>" +
+      '<div class="form-actions stay-choices">' + choices + "</div>" +
+      '<button class="text-button" type="button" data-action="new-stay-on-date">' +
+      "Lägg till en annan vistelse</button></section>";
+  }
   const values = model.values ?? {};
   const errors = model.fieldErrors ?? {};
   const title = model.mode === "edit" ? "Redigera vistelse" : "Lägg till vistelse";
@@ -87,7 +131,7 @@ export function renderStayDialog(model) {
   return '<section class="stay-dialog"><header><h2 id="stay-dialog-title">' +
     title + '</h2><button class="dialog-close" type="button" ' +
     'data-action="cancel-stay" aria-label="Stäng">&times;</button></header>' +
-    message + '<form data-form="stay" novalidate>' +
+    '<form data-form="stay" novalidate><div class="stay-dialog__body">' + message +
     '<div class="date-pair"><div class="field"><label for="stay-arrivalDate">' +
     'Ankomstdatum</label><input id="stay-arrivalDate" name="arrivalDate" type="date" value="' +
     escapeHtml(values.arrivalDate ?? "") + '"' +
@@ -104,11 +148,12 @@ export function renderStayDialog(model) {
     actualChecked + "> Faktisk</label>" +
     '<label class="radio-option"><input type="radio" name="status" value="planned"' +
     plannedChecked + "> Planerad</label></div>" + errorFor(errors, "status") +
-    "</fieldset>" + renderPreview(model.preview) +
-    '<div class="form-actions"><button class="primary-button" type="submit">' +
+    '</fieldset><div class="stay-preview-slot" aria-live="polite" aria-atomic="true">' +
+    renderPreview(model.preview) + "</div>" + renderDelete(model) + '</div>' +
+    '<footer class="stay-dialog__actions"><div class="form-actions"><button class="primary-button" type="submit">' +
     (model.mode === "edit" ? "Spara ändringar" : "Lägg till vistelse") +
     '</button><button class="secondary-button" type="button" data-action="cancel-stay">' +
-    "Avbryt</button></div>" + renderDelete(model) + "</form></section>";
+    "Avbryt</button></div></footer></form></section>";
 }
 
 export function openStayDialog(dialog, model, returnFocusElement) {
@@ -120,7 +165,27 @@ export function openStayDialog(dialog, model, returnFocusElement) {
   if (!dialog.open && typeof dialog.showModal === "function") {
     dialog.showModal();
   }
-  dialog.querySelector?.('[name="arrivalDate"]')?.focus?.();
+  const firstInput = dialog.querySelector?.(model.choices?.length
+    ? '[data-action="choose-stay"]'
+    : 'input[aria-invalid="true"], [aria-invalid="true"] input')
+    ?? dialog.querySelector?.('[name="arrivalDate"]');
+  firstInput?.focus?.();
+}
+
+export function updateStayPreview(dialog, preview) {
+  const slot = dialog.querySelector?.(".stay-preview-slot");
+  if (!slot) return;
+  const expanded = slot.querySelector?.("details")?.open;
+  slot.innerHTML = renderPreview(preview);
+  const details = slot.querySelector?.("details");
+  if (details && expanded) details.open = true;
+  for (const error of dialog.querySelectorAll?.(".field-error, .error-summary") ?? []) {
+    error.remove();
+  }
+  for (const field of dialog.querySelectorAll?.('[aria-invalid="true"]') ?? []) {
+    field.removeAttribute("aria-invalid");
+    field.removeAttribute("aria-describedby");
+  }
 }
 
 export function closeStayDialog(dialog) {

@@ -29,13 +29,18 @@ export function evaluatePlannedStay(
     : stays;
   const combinedStays = [...baseStays, { ...candidate, status: "planned" }];
   const result = calculateBudget(profile, combinedStays);
+  const base = summarizePeriod(baseStays, profile.periodStart, profile.periodEnd);
   const rankByDate = new Map(
     result.registeredDates.map((date, index) => [date, index + 1])
   );
-  const candidateDates = eachDateInclusive(
+  const allCandidateDates = eachDateInclusive(
     candidate.arrivalDate,
     candidate.departureDate
-  ).filter((date) => date >= profile.periodStart && date <= profile.periodEnd);
+  );
+  const candidateDates = allCandidateDates.filter(
+    (date) => date >= profile.periodStart && date <= profile.periodEnd
+  );
+  const candidateNewDays = result.uniqueDays - base.uniqueDays;
   const candidateWithin = candidateDates.filter(
     (date) => rankByDate.get(date) <= profile.budgetDays
   );
@@ -45,6 +50,11 @@ export function evaluatePlannedStay(
 
   return {
     ...result,
+    candidateDays: allCandidateDates.length,
+    candidateDaysInPeriod: candidateDates.length,
+    candidateNewDays,
+    candidateOverlapDays: candidateDates.length - candidateNewDays,
+    candidateDaysOutsidePeriod: allCandidateDates.length - candidateDates.length,
     candidateLastWithinBudgetDate: candidateWithin.at(-1) ?? null,
     candidateFirstExceededDate: candidateOver[0] ?? null
   };

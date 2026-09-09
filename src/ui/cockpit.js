@@ -103,6 +103,7 @@ export function buildCockpitModel(state, {
   today,
   year = Number(state.profile.periodStart.slice(0, 4)),
   focusedDate = null,
+  calendarView = "month",
   storageIssue = null,
   clearRequested = false,
   demo = false,
@@ -126,6 +127,7 @@ export function buildCockpitModel(state, {
     statusByDate: budget.statusByDate,
     year,
     focusedDate: focus,
+    calendarView,
     storageIssue,
     clearRequested,
     demo,
@@ -191,6 +193,30 @@ export function renderYearCalendar(model) {
     "</div>";
 }
 
+function renderCalendar(model) {
+  const month = Number(model.focusedDate.slice(5, 7));
+  const wholeYear = model.calendarView === "year";
+  const label = wholeYear ? String(model.year) : MONTHS[month - 1] + " " + model.year;
+  const unit = wholeYear ? "year" : "month";
+  const calendar = wholeYear
+    ? renderYearCalendar(model)
+    : '<div class="year-calendar year-calendar--month">' + renderMonth(model, month) + "</div>";
+  return '<section class="calendar-panel">' +
+    '<div class="calendar-toolbar"><p class="section-kicker">Kalender</p>' +
+    '<button class="secondary-button" type="button" data-action="toggle-calendar" ' +
+    'aria-pressed="' + wholeYear + '">Visa ' + (wholeYear ? "månad" : "hela året") + "</button></div>" +
+    '<div class="year-nav"><button type="button" data-action="previous-' + unit +
+    '" aria-label="Föregående ' + (wholeYear ? "år" : "månad") + '"' +
+    (model.year === 100 && (wholeYear || month === 1) ? " disabled" : "") +
+    '>←</button><h2>' + escapeHtml(label) +
+    '</h2><button type="button" data-action="next-' + unit +
+    '" aria-label="Nästa ' + (wholeYear ? "år" : "månad") + '"' +
+    (model.year === 9999 && (wholeYear || month === 12) ? " disabled" : "") +
+    '>→</button></div><p class="calendar-hint">Kalendern ändrar inte din budgetperiod. ' +
+    (model.demo ? "Exempeldagarna kan inte ändras." : "Välj en dag för att lägga till eller ändra en vistelse.") +
+    "</p>" + calendar + "</section>";
+}
+
 function renderEmptyStayList(model) {
   return '<div class="empty-state"><h2>Inga Sverigedagar registrerade</h2>' +
     "<p>Omarkerade dagar är inte registrerade och bevisar inte utlandsvistelse.</p>" +
@@ -224,7 +250,9 @@ function renderStayList(model) {
       ? '<div class="stay-outcome"><p>Genomfördes den här planerade vistelsen?</p>' +
         '<button class="secondary-button stay-confirm" type="button" ' +
         'data-action="confirm-actual" data-stay-id="' + escapedId + '">' +
-        "Ja, markera som genomförd</button></div>"
+        "Ja, markera som genomförd</button>" +
+        '<button class="text-button" type="button" data-action="cancel-planned" ' +
+        'data-stay-id="' + escapedId + '">Nej, blev inte av</button></div>'
       : "";
 
     return '<li><button class="stay-row stay-row--' + statusKey +
@@ -241,14 +269,6 @@ function renderBudgetStatus(model) {
       dayWord(model.budget.overBy) + " över din personliga budget"
     : model.budget.remaining + " " + dayWord(model.budget.remaining) +
       " kvar i din personliga budget";
-  const boundary = model.budget.lastWithinBudgetDate
-    ? "<p>Senaste registrerade dag inom budget: " +
-      escapeHtml(formatDate(model.budget.lastWithinBudgetDate)) + "</p>"
-    : "<p>Ingen budgetgräns nås av den registrerade planen.</p>";
-  const exceeded = model.budget.firstExceededDate
-    ? "<p>Första registrerade dag över budget: " +
-      escapeHtml(formatDate(model.budget.firstExceededDate)) + "</p>"
-    : "";
   const meterValue = Math.min(model.budget.uniqueDays, model.profile.budgetDays);
   const fill = Math.min(100, Math.round(
     (model.budget.uniqueDays / model.profile.budgetDays) * 100
@@ -264,14 +284,21 @@ function renderBudgetStatus(model) {
       excludedIntervals.map(renderDateInterval).join(", ") + "</span>.</p>"
     : "";
 
-  return '<section class="budget-status" aria-labelledby="budget-heading">' +
+  return '<section class="budget-status' + (model.budget.overBy > 0 ? " budget-status--over" : "") +
+    '" aria-labelledby="budget-heading">' +
     '<div><p class="section-kicker">Personlig dagbudget</p>' +
-    '<h2 id="budget-heading">' + escapeHtml(budgetCopy) + "</h2>" + boundary +
-    exceeded + excluded + "</div>" +
+    '<h2 id="budget-heading" aria-label="' + escapeHtml(budgetCopy) + '"><strong>' +
+    escapeHtml(model.budget.overBy > 0 ? model.budget.overBy : model.budget.remaining) +
+    '</strong><span>' + dayWord(model.budget.overBy > 0 ? model.budget.overBy : model.budget.remaining) +
+    (model.budget.overBy > 0 ? " över budget" : " kvar") + '</span></h2>' +
+    '<p class="budget-period">Budgetperiod: ' + escapeHtml(formatDate(model.profile.periodStart)) +
+    " till " + escapeHtml(formatDate(model.profile.periodEnd)) + "</p>" + excluded + "</div>" +
+    '<div class="budget-usage"><p>' + escapeHtml(model.budget.uniqueDays) + " av " +
+    escapeHtml(model.profile.budgetDays) + ' dagar använda</p>' +
     '<div class="budget-meter" role="progressbar" aria-label="Använd dagbudget" ' +
     'aria-valuemin="0" aria-valuemax="' + escapeHtml(model.profile.budgetDays) +
     '" aria-valuenow="' + escapeHtml(meterValue) + '" style="--budget-fill: ' +
-    fill + '%"><span aria-hidden="true"></span></div></section>';
+    fill + '%"><span aria-hidden="true"></span></div></div></section>';
 }
 
 function renderHeader(model) {
@@ -290,15 +317,16 @@ function renderHeader(model) {
 }
 
 function renderSummary(model) {
+  const overlap = model.explanation.totals.overlapDays;
   return '<section class="summary-grid" aria-label="Dagsammanställning">' +
     '<article><strong>' + escapeHtml(model.budget.actualDays) +
     '</strong><span>Faktiska dagar</span></article>' +
     '<article><strong>' + escapeHtml(model.budget.plannedDays) +
     '</strong><span>Planerade dagar</span></article>' +
     '<article><strong>' + escapeHtml(model.budget.uniqueDays) +
-    '</strong><span>Unika dagar totalt</span></article>' +
-    '<article><strong>' + escapeHtml(model.profile.budgetDays) +
-    '</strong><span>Personlig budget</span></article></section>';
+    '</strong><span>Unika dagar totalt</span></article></section>' +
+    (overlap > 0 ? '<p class="summary-overlap">' + overlap + " " + dayWord(overlap) +
+      " finns i både faktiska och planerade vistelser. Överlapp räknas bara en gång i totalen.</p>" : "");
 }
 
 export function renderCockpit(model) {
@@ -327,30 +355,29 @@ export function renderCockpit(model) {
 
   return '<div class="cockpit-shell">' + demoBanner + storageBanner +
     renderHeader(model) + '<div class="cockpit-content">' +
-    '<section class="cockpit-hero">' + renderSummary(model) +
-    renderBudgetStatus(model) +
+    '<section class="cockpit-hero">' + renderBudgetStatus(model) + renderSummary(model) +
     renderBudgetExplanation(model.explanation) +
     "</section>" +
+    (model.demo ? "" : '<p class="local-notice">' +
+      (model.storageIssue ? "Kontrollera lagringsmeddelandet ovan. " : "Sparas i den här webbläsaren. ") +
+      'Ingen automatisk synk mellan enheter. <a href="#data-tools-heading">Spara en backup</a>.</p>') +
+    '<div class="cockpit-layout' + (model.calendarView === "year" ? " cockpit-layout--year" : "") +
+    '"><section class="aside-card stay-panel">' +
+    "<h2>Vistelser</h2>" + renderStayList(model) + '</section>' +
+    renderCalendar(model) +
     '<div class="legend" aria-label="Kalenderförklaring">' +
     '<span class="legend__item legend--actual"><i aria-hidden="true"></i>Faktisk</span>' +
     '<span class="legend__item legend--planned"><i aria-hidden="true"></i>Planerad</span>' +
     '<span class="legend__item legend--unregistered"><i aria-hidden="true"></i>' +
     "Inte registrerad</span></div>" +
-    '<div class="cockpit-layout"><section class="calendar-panel">' +
-    '<div class="year-nav"><button type="button" data-action="previous-year" ' +
-    'aria-label="Föregående år">←</button><h2>' + escapeHtml(model.year) +
-    '</h2><button type="button" data-action="next-year" aria-label="Nästa år">' +
-    "→</button></div>" + renderYearCalendar(model) +
-    '</section><aside class="cockpit-aside"><section class="aside-card">' +
-    "<h2>Vistelser</h2>" + renderStayList(model) +
-    '</section><section class="aside-card"><h2>Juridiska observationer</h2>' +
+    '<details class="aside-card legal-panel"><summary>Juridiska observationer</summary>' +
     renderObservations(model.observations, LEGAL_SOURCES) +
-    "</section>" +
+    "</details>" +
     (model.demo
       ? ""
       : renderDataTools({
           restorePreview: model.restorePreview,
           canExport: true
         })) +
-    "</aside></div>" + footer + "</div></div>";
+    "</div>" + footer + "</div></div>";
 }

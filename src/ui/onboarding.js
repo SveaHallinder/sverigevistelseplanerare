@@ -98,7 +98,7 @@ export function renderOnboarding({
 }) {
   const defaults = profile ?? {
     departureDate: "",
-    budgetDays: 90,
+    budgetDays: "",
     periodStart: defaultYear + "-01-01",
     periodEnd: defaultYear + "-12-31",
     swedishCitizen: "unanswered",
@@ -131,11 +131,10 @@ export function renderOnboarding({
     '<div class="onboarding-layout">' +
     '<header class="onboarding-header"><p class="eyebrow">Sverigevistelseplaneraren</p>' +
     '<h1 id="onboarding-title">' +
-    (editing ? "Ändra din plan" : "Planera Sverigedagar med tydliga antaganden") +
+    (editing ? "Ändra din plan" : "Håll koll på dina dagar i Sverige") +
     "</h1>" +
-    '<p class="disclaimer">Planeringsverktyg, inte juridisk rådgivning. ' +
-    "Ett grönt budgetläge är inte ett juridiskt besked.</p>" +
-    '<ul class="onboarding-points" aria-hidden="true">' +
+    '<p class="disclaimer">Planeringsverktyg, inte juridisk rådgivning.</p>' +
+    '<ul class="onboarding-points">' +
     "<li>Räkna faktiska och planerade dagar separat</li>" +
     "<li>Din budget är ett eget tak, inte ett lagkrav</li>" +
     "<li>Allt sparas lokalt i din webbläsare</li>" +
@@ -148,9 +147,13 @@ export function renderOnboarding({
     errorAttributes(fieldErrors, "departureDate") + ">" +
     errorFor(fieldErrors, "departureDate") + "</div>" +
     '<div class="field"><label for="budgetDays">Personlig dagbudget</label>' +
-    '<span class="field-hint" id="budgetDays-hint">Ditt eget planeringstak, inte en laggräns.</span>' +
+    '<span class="field-hint" id="budgetDays-hint">Välj själv hur många dagar du vill planera för. ' +
+    'Det är ditt personliga planeringstak, inte en laggräns.</span>' +
     '<input id="budgetDays" name="budgetDays" type="number" min="1" step="1" value="' +
-    escapeHtml(defaults.budgetDays) + '"' + errorAttributes(fieldErrors, "budgetDays") + ">" +
+    escapeHtml(defaults.budgetDays) + '"' +
+    (fieldErrors.budgetDays ? ' aria-invalid="true"' : "") +
+    ' aria-describedby="budgetDays-hint' +
+    (fieldErrors.budgetDays ? " budgetDays-error" : "") + '">' +
     errorFor(fieldErrors, "budgetDays") + "</div>" +
     '<div class="date-pair"><div class="field"><label for="periodStart">Period från</label>' +
     '<input id="periodStart" name="periodStart" type="date" value="' +
@@ -187,7 +190,7 @@ export function renderOnboarding({
     "</div></form>" +
     (editing
       ? ""
-      : '<button class="text-button" type="button" data-action="show-demo">Visa syntetiskt demoexempel</button>') +
+      : '<button class="text-button" type="button" data-action="show-demo">Prova med exempel</button>') +
     renderDataTools({ restorePreview, canExport }) +
     "</div></div></section>";
 }

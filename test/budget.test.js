@@ -133,6 +133,9 @@ test("evaluatePlannedStay excludes the edited stay and forces candidate to plann
   assert.equal(result.candidateLastWithinBudgetDate, "2026-08-11");
   assert.equal(result.candidateFirstExceededDate, null);
   assert.equal(result.statusByDate["2026-08-10"], "planned");
+  assert.equal(result.candidateDays, 2);
+  assert.equal(result.candidateNewDays, 2);
+  assert.equal(result.candidateOverlapDays, 0);
   assert.deepEqual(stays, staysBefore);
   assert.deepEqual(candidate, candidateBefore);
 });
@@ -178,6 +181,11 @@ test("evaluatePlannedStay ranks overlapping candidate dates after period clippin
   assert.equal(result.candidateLastWithinBudgetDate, "2026-08-05");
   assert.equal(result.candidateFirstExceededDate, "2026-08-06");
   assert.equal(result.statusByDate["2026-08-02"], "actual");
+  assert.equal(result.candidateDays, 7);
+  assert.equal(result.candidateDaysInPeriod, 5);
+  assert.equal(result.candidateNewDays, 3);
+  assert.equal(result.candidateOverlapDays, 2);
+  assert.equal(result.candidateDaysOutsidePeriod, 2);
 });
 
 test("evaluatePlannedStay reports no candidate boundary outside the period", () => {
@@ -195,6 +203,11 @@ test("evaluatePlannedStay reports no candidate boundary outside the period", () 
   assert.equal(result.excludedDays, 3);
   assert.equal(result.candidateLastWithinBudgetDate, null);
   assert.equal(result.candidateFirstExceededDate, null);
+  assert.equal(result.candidateDays, 3);
+  assert.equal(result.candidateDaysInPeriod, 0);
+  assert.equal(result.candidateNewDays, 0);
+  assert.equal(result.candidateOverlapDays, 0);
+  assert.equal(result.candidateDaysOutsidePeriod, 3);
 });
 
 test("budget ranks non-contiguous registered dates chronologically", () => {
