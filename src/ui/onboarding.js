@@ -94,7 +94,8 @@ export function renderOnboarding({
   clearRequested = false,
   defaultYear,
   restorePreview = null,
-  canExport = false
+  canExport = false,
+  native = false
 }) {
   const defaults = profile ?? {
     departureDate: "",
@@ -137,7 +138,7 @@ export function renderOnboarding({
     '<ul class="onboarding-points">' +
     "<li>Räkna faktiska och planerade dagar separat</li>" +
     "<li>Din budget är ett eget tak, inte ett lagkrav</li>" +
-    "<li>Allt sparas lokalt i din webbläsare</li>" +
+    "<li>" + (native ? "Allt sparas lokalt i appen" : "Allt sparas lokalt i din webbläsare") + "</li>" +
     "</ul></header>" +
     '<div class="onboarding-body">' + storageBanner + storageClear + errorSummary +
     '<form data-form="profile" novalidate>' +
@@ -191,7 +192,7 @@ export function renderOnboarding({
     (editing
       ? ""
       : '<button class="text-button" type="button" data-action="show-demo">Prova med exempel</button>') +
-    renderDataTools({ restorePreview, canExport }) +
+    renderDataTools({ restorePreview, canExport, native }) +
     "</div></div></section>";
 }
 

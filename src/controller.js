@@ -11,6 +11,7 @@ import {
   parseBackupJson
 } from "./data-transfer.js";
 import { createDemoState } from "./demo-state.js";
+import { isIsoDate } from "./domain/dates.js";
 
 const BLOCKING_STORAGE_ISSUES = new Set([
   "unsupported-version",
@@ -63,7 +64,7 @@ export function createAppController({
   }
 
   function blockedByRestore() {
-    return restoreCandidate === null
+    return restorePreview === null
       ? null
       : result(false, "Bekräfta eller avbryt återställningen först.");
   }
@@ -90,6 +91,17 @@ export function createAppController({
     state = loaded.state;
     storageIssue = loaded.issue;
     publish();
+    return result(true);
+  }
+
+  function updateToday(value, { publish: shouldPublish = true } = {}) {
+    if (!isIsoDate(value)) {
+      return result(false, "Enhetens datum kunde inte användas.");
+    }
+    if (today !== value) {
+      today = value;
+      if (shouldPublish) publish();
+    }
     return result(true);
   }
 
@@ -245,11 +257,28 @@ export function createAppController({
     );
   }
 
+  function beginRestore({ fileName }) {
+    const blocked = blockedByDemo() ?? blockedByStorage();
+    if (blocked) return blocked;
+    restoreCandidate = null;
+    restorePreview = {
+      fileName: String(fileName || "backup.json").slice(0, 255),
+      loading: true
+    };
+    publish();
+    return result(true, "Kontrollerar backupfilen…");
+  }
+
   function previewRestore({ raw, fileName }) {
     const blocked = blockedByDemo() ?? blockedByStorage();
     if (blocked) return blocked;
     const parsed = parseBackupJson(raw);
     if (!parsed.ok) {
+      if (restorePreview !== null) {
+        restoreCandidate = null;
+        restorePreview = null;
+        publish();
+      }
       return result(false, parsed.message);
     }
     restoreCandidate = parsed.value;
@@ -304,6 +333,7 @@ export function createAppController({
 
   return {
     init,
+    updateToday,
     saveProfile,
     saveStay,
     removeStay,
@@ -315,6 +345,7 @@ export function createAppController({
     clearAll,
     createBackupDownload,
     createCsvDownload,
+    beginRestore,
     previewRestore,
     cancelRestore,
     confirmRestore,

@@ -3,7 +3,9 @@ import { MAX_IMPORT_BYTES } from "./data-transfer.js";
 import { evaluatePlannedStay } from "./domain/budget.js";
 import { addDays, addMonthsClamped, isIsoDate, todayLocalIso } from "./domain/dates.js";
 import { createStateRepository } from "./storage.js";
+import { createNativeFileBridge } from "./native-files.js";
 import { buildCockpitModel, renderCockpit } from "./ui/cockpit.js";
+import { renderDataTools } from "./ui/data-tools.js";
 import { readProfileForm, renderOnboarding } from "./ui/onboarding.js";
 import {
   closeStayDialog,
@@ -74,7 +76,8 @@ export function createBrowserApp(options = {}) {
     return null;
   }
 
-  const today = options.today ?? todayLocalIso();
+  const getToday = options.getToday ?? (() => options.today ?? todayLocalIso());
+  let today = getToday();
   const now = options.now ?? (() => new Date().toISOString());
   const makeId = options.makeId ?? createIdFactory(windowRef);
   const repository = options.repository ?? createStateRepository({
@@ -82,7 +85,10 @@ export function createBrowserApp(options = {}) {
     sessionStorage: safeWindowValue(windowRef, "sessionStorage")
   });
   const readFileText = options.readFileText ?? ((file) => file.text());
+  const nativeFiles = createNativeFileBridge(windowRef);
+  const chooseBackupFile = options.chooseBackupFile ?? nativeFiles?.chooseBackupFile;
   const downloadFile = options.downloadFile
+    ?? nativeFiles?.downloadFile
     ?? ((file) => defaultDownloadFile(documentRef, windowRef, file));
   let published = null;
   let viewYear = yearFromDate(today);
@@ -90,11 +96,19 @@ export function createBrowserApp(options = {}) {
   let calendarView = "month";
   let currentDialog = null;
   let clearRequested = false;
+  let restoreRequest = 0;
+  let pendingDateRender = false;
 
   function announce(message) {
     if (message) {
       liveRegion.textContent = message;
     }
+  }
+
+  function announceData(message) {
+    const feedback = app.querySelector?.("[data-tools-feedback]");
+    if (feedback) feedback.textContent = message;
+    announce(message);
   }
 
   function blockedByPendingRestore() {
@@ -109,6 +123,7 @@ export function createBrowserApp(options = {}) {
     if (!published) {
       return;
     }
+    pendingDateRender = false;
     if (published.state?.profile && !published.editingProfile) {
       const model = buildCockpitModel(published.state, {
         today: published.today,
@@ -121,7 +136,7 @@ export function createBrowserApp(options = {}) {
         restorePreview: published.restorePreview ?? null
       });
       focusedDate = model.focusedDate;
-      app.innerHTML = renderCockpit(model);
+      app.innerHTML = renderCockpit({ ...model, native: Boolean(nativeFiles) });
       return;
     }
 
@@ -133,13 +148,31 @@ export function createBrowserApp(options = {}) {
       clearRequested,
       defaultYear: today.slice(0, 4),
       restorePreview: published.restorePreview ?? null,
-      canExport: Boolean(published.state?.profile)
+      canExport: Boolean(published.state?.profile),
+      native: Boolean(nativeFiles)
     });
   }
 
   function receivePublished(nextPublished) {
+    const preserveProfileForm = published
+      && published.state === nextPublished.state
+      && published.editingProfile === nextPublished.editingProfile
+      && published.storageIssue === nextPublished.storageIssue
+      && !nextPublished.demo
+      && app.querySelector?.('[data-form="profile"]')?.matches?.('[data-form="profile"]');
     const previousProfile = published?.state?.profile;
     published = nextPublished;
+    if (preserveProfileForm) {
+      const dataTools = app.querySelector?.(".data-tools");
+      if (dataTools) {
+        dataTools.outerHTML = renderDataTools({
+          restorePreview: published.restorePreview ?? null,
+          canExport: Boolean(published.state?.profile),
+          native: Boolean(nativeFiles)
+        });
+        return;
+      }
+    }
     const profile = published.state?.profile;
     if (profile && (!previousProfile || profile.periodStart !== previousProfile.periodStart
       || profile.periodEnd !== previousProfile.periodEnd)) {
@@ -163,6 +196,59 @@ export function createBrowserApp(options = {}) {
     today
   });
 
+  function refreshToday() {
+    const nextToday = getToday();
+    if (nextToday === today) return;
+    const canRender = Boolean(published?.state?.profile)
+      && !published.editingProfile && !currentDialog;
+    const focusedTarget = documentRef.activeElement?.dataset;
+    const updated = controller.updateToday(nextToday, { publish: canRender });
+    if (!updated.ok) return;
+    today = nextToday;
+    if (!canRender && published) {
+      published = { ...published, today };
+      pendingDateRender = true;
+    }
+    if (canRender && focusedTarget?.action) {
+      Array.from(app.querySelectorAll?.("[data-action]") ?? [])
+        .find((button) => button.dataset.action === focusedTarget.action
+          && button.dataset.stayId === focusedTarget.stayId
+          && button.dataset.date === focusedTarget.date)?.focus?.();
+    }
+  }
+
+  function restoreReadFailed(error) {
+    controller.cancelRestore();
+    announceData(error?.code === "oversized"
+      ? "Backupfilen är större än 1 MiB och har inte lästs in."
+      : "Backupfilen kunde inte läsas. Ingen data har ändrats.");
+    app.querySelector?.('[data-action="choose-restore"]')?.focus?.();
+  }
+
+  async function readSelectedBackup(file, request) {
+    if (file.size > MAX_IMPORT_BYTES) {
+      restoreReadFailed({ code: "oversized" });
+      return;
+    }
+    app.querySelector?.('[data-action="cancel-restore"]')?.focus?.();
+    let raw;
+    try {
+      raw = await readFileText(file);
+    } catch (error) {
+      if (request === restoreRequest) restoreReadFailed(error);
+      return;
+    }
+    if (request !== restoreRequest) return;
+    const previewed = controller.previewRestore({ raw, fileName: file.name });
+    announceData(previewed.message);
+    app.querySelector?.('[data-action="' + (previewed.ok ? "confirm-restore" : "choose-restore") + '"]')?.focus?.();
+  }
+
+  windowRef.addEventListener?.("focus", refreshToday);
+  documentRef.addEventListener?.("visibilitychange", () => {
+    if (!documentRef.hidden) refreshToday();
+  });
+
   function dialogPreview(values, id) {
     const state = controller.getSnapshot().state;
     if (!state?.profile
@@ -175,7 +261,7 @@ export function createBrowserApp(options = {}) {
       state.profile,
       state.stays,
       values,
-      id ? { excludeStayId: id } : {}
+      { expandDates: false, ...(id ? { excludeStayId: id } : {}) }
     );
     return { ...preview, budgetDays: state.profile.budgetDays };
   }
@@ -219,6 +305,10 @@ export function createBrowserApp(options = {}) {
   }
 
   function closeCurrentDialog() {
+    if (pendingDateRender) {
+      renderPublished();
+      pendingDateRender = false;
+    }
     const needsFallbackFocus = currentDialog?.returnFocusElement?.isConnected === false;
     closeStayDialog(dialog);
     currentDialog = null;
@@ -305,6 +395,7 @@ export function createBrowserApp(options = {}) {
       return;
     }
     event.preventDefault();
+    refreshToday();
     const input = readProfileForm(event.target);
     const saved = controller.saveProfile(input);
     if (!saved.ok) {
@@ -317,13 +408,15 @@ export function createBrowserApp(options = {}) {
       return;
     }
     announce(saved.message);
+    (app.querySelector?.('[data-action="add-stay"]') ?? app)?.focus?.();
   });
 
-  app.addEventListener("click", (event) => {
+  app.addEventListener("click", async (event) => {
     const target = event.target?.closest?.("[data-action]");
     if (!target) {
       return;
     }
+    refreshToday();
     const action = target.dataset.action;
     if (action === "previous-year" || action === "next-year") {
       changeYear(action === "previous-year" ? -1 : 1);
@@ -344,15 +437,25 @@ export function createBrowserApp(options = {}) {
     } else if (action === "confirm-actual") {
       const result = controller.confirmPastPlanned(target.dataset.stayId);
       announce(result.message);
+      if (result.ok) {
+        const stayButton = Array.from(app.querySelectorAll?.('[data-action="edit-stay"]') ?? [])
+          .find((button) => button.dataset.stayId === target.dataset.stayId);
+        (stayButton ?? app.querySelector?.('[data-action="add-stay"]') ?? app)?.focus?.();
+      }
     } else if (action === "show-demo") {
       announce(controller.showDemo().message);
     } else if (action === "exit-demo") {
       announce(controller.exitDemo().message);
     } else if (action === "edit-profile") {
-      announce(controller.beginEditProfile().message);
+      const edited = controller.beginEditProfile();
+      announce(edited.message);
+      if (edited.ok) app.querySelector?.('[name="departureDate"]')?.focus?.();
     } else if (action === "cancel-edit-profile") {
-      announce(controller.cancelEditProfile().message);
+      const cancelled = controller.cancelEditProfile();
+      announce(cancelled.message);
+      if (cancelled.ok) (app.querySelector?.('[data-action="edit-profile"]') ?? app)?.focus?.();
     } else if (action === "request-clear") {
+      if (blockedByPendingRestore()) return;
       clearRequested = true;
       renderPublished();
       app.querySelector?.('[data-action="confirm-clear"]')?.focus?.();
@@ -365,26 +468,52 @@ export function createBrowserApp(options = {}) {
         ? controller.createBackupDownload()
         : controller.createCsvDownload();
       if (!created.ok) {
-        announce(created.message);
+        announceData(created.message);
         return;
       }
       try {
-        downloadFile(created.download);
+        const transfer = downloadFile(created.download);
+        const completed = transfer && typeof transfer.then === "function"
+          ? await transfer : transfer;
+        announceData(completed?.cancelled
+          ? "Exporten avbröts. Ingen fil har exporterats."
+          : completed?.message ?? created.message);
       } catch {
-        announce("Filen kunde inte laddas ner.");
+        announceData(nativeFiles ? "Filen kunde inte exporteras." : "Filen kunde inte laddas ner.");
+      }
+    } else if (action === "choose-restore") {
+      if (!chooseBackupFile) {
+        app.querySelector?.('[data-file-input="restore"]')?.click?.();
         return;
       }
-      announce(created.message);
-    } else if (action === "choose-restore") {
-      app.querySelector?.('[data-file-input="restore"]')?.click?.();
+      const request = ++restoreRequest;
+      const reading = controller.beginRestore({ fileName: "Välj backupfil" });
+      if (!reading.ok) {
+        announceData(reading.message);
+        return;
+      }
+      try {
+        const file = await chooseBackupFile();
+        if (request !== restoreRequest) return;
+        if (!file) {
+          const cancelled = controller.cancelRestore();
+          announceData(cancelled.message);
+          app.querySelector?.('[data-action="choose-restore"]')?.focus?.();
+          return;
+        }
+        await readSelectedBackup(file, request);
+      } catch (error) {
+        if (request === restoreRequest) restoreReadFailed(error);
+      }
     } else if (action === "cancel-restore") {
+      restoreRequest += 1;
       const cancelled = controller.cancelRestore();
-      announce(cancelled.message);
+      announceData(cancelled.message);
       app.querySelector?.('[data-action="choose-restore"]')?.focus?.();
     } else if (action === "confirm-restore") {
       const confirmed = controller.confirmRestore({ confirmed: true });
-      announce(confirmed.message);
       if (!confirmed.ok) {
+        announceData(confirmed.message);
         app.querySelector?.('[data-action="confirm-restore"]')?.focus?.();
         return;
       }
@@ -396,6 +525,7 @@ export function createBrowserApp(options = {}) {
         calendarView = "month";
         renderPublished();
       }
+      announceData(confirmed.message);
       (app.querySelector?.('[data-action="choose-restore"]') ?? app)?.focus?.();
     } else if (action === "confirm-clear") {
       const cleared = controller.clearAll({ confirmed: true });
@@ -410,26 +540,18 @@ export function createBrowserApp(options = {}) {
 
   app.addEventListener("change", async (event) => {
     if (!event.target?.matches?.('[data-file-input="restore"]')) return;
+    refreshToday();
     const input = event.target;
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    if (file.size > MAX_IMPORT_BYTES) {
-      announce("Backupfilen är större än 1 MiB och har inte lästs in.");
+    const request = ++restoreRequest;
+    const reading = controller.beginRestore({ fileName: file.name });
+    if (!reading.ok) {
+      announceData(reading.message);
       return;
     }
-    let raw;
-    try {
-      raw = await readFileText(file);
-    } catch {
-      announce("Backupfilen kunde inte läsas. Ingen data har ändrats.");
-      return;
-    }
-    const previewed = controller.previewRestore({ raw, fileName: file.name });
-    announce(previewed.message);
-    if (previewed.ok) {
-      app.querySelector?.('[data-action="confirm-restore"]')?.focus?.();
-    }
+    await readSelectedBackup(file, request);
   });
 
   app.addEventListener("keydown", (event) => {
@@ -439,6 +561,7 @@ export function createBrowserApp(options = {}) {
     }
     if (event.key === "Enter") {
       event.preventDefault();
+      refreshToday();
       openCalendarDate(target.dataset.date, target);
       return;
     }
@@ -453,6 +576,7 @@ export function createBrowserApp(options = {}) {
       return;
     }
     event.preventDefault();
+    refreshToday();
     const nextDate = addDays(target.dataset.date, offset);
     if (!isIsoDate(nextDate)) return;
     focusedDate = nextDate;
@@ -466,6 +590,7 @@ export function createBrowserApp(options = {}) {
       return;
     }
     event.preventDefault();
+    refreshToday();
     const input = readStayForm(event.target);
     currentDialog.values = input;
     const saved = controller.saveStay(input, currentDialog.id);
@@ -488,6 +613,7 @@ export function createBrowserApp(options = {}) {
   });
 
   dialog.addEventListener("change", (event) => {
+    refreshToday();
     const form = event.target?.closest?.('[data-form="stay"]');
     if (!form || !currentDialog) {
       return;
@@ -499,6 +625,7 @@ export function createBrowserApp(options = {}) {
   });
 
   dialog.addEventListener("click", (event) => {
+    refreshToday();
     const target = event.target?.closest?.("[data-action]");
     if (!target || !currentDialog) {
       return;

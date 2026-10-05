@@ -7,6 +7,7 @@ import {
   maxRollingTwelveMonthDays
 } from "../src/domain/patterns.js";
 import { TEMPORARY_BREAK_SCENARIOS } from "./fixtures/legal-scenarios.js";
+import { calculateBudget } from "../src/domain/budget.js";
 
 test("official temporary-break scenarios stay source-backed", async (context) => {
   for (const scenario of TEMPORARY_BREAK_SCENARIOS) {
@@ -37,6 +38,13 @@ test("getSixMonthStays requires the interval to reach its six-month date", () =>
     departureDate: "2026-07-01",
     sixMonthDate: "2026-07-01"
   }]);
+});
+
+test("getSixMonthStays does not shorten boundaries beyond the supported input range", () => {
+  assert.deepEqual(getSixMonthStays([{
+    arrivalDate: "9999-12-31",
+    departureDate: "9999-12-31"
+  }]), []);
 });
 
 test("getPossibleTemporaryBreaks reports a gap no longer than either stay", () => {
@@ -92,6 +100,20 @@ test("getPossibleTemporaryBreaks excludes a gap longer than either stay", () => 
   ];
 
   assert.deepEqual(getPossibleTemporaryBreaks(intervals), []);
+});
+
+test("getPossibleTemporaryBreaks compares a derived boundary above year 9999", () => {
+  const intervals = [
+    { arrivalDate: "9998-01-01", departureDate: "9999-06-30" },
+    { arrivalDate: "9999-10-01", departureDate: "9999-12-31" }
+  ];
+
+  const result = getPossibleTemporaryBreaks(intervals);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].gapStart, "9999-07-01");
+  assert.equal(result[0].gapEnd, "9999-09-30");
+  assert.equal(result[0].gapDays, 92);
 });
 
 test("calculatePatternFacts merges overlap and adjacency before measuring gaps", () => {
@@ -153,6 +175,18 @@ test("maxRollingTwelveMonthDays uses inclusive endpoints and the oldest tie", ()
     count: 2,
     windowStart: "2025-03-01",
     windowEnd: "2026-02-28"
+  });
+});
+
+test("maxRollingTwelveMonthDays includes the final supported year without truncating its window", () => {
+  assert.deepEqual(maxRollingTwelveMonthDays([{
+    arrivalDate: "9999-12-01",
+    departureDate: "9999-12-31",
+    status: "actual"
+  }]), {
+    count: 31,
+    windowStart: "9999-12-01",
+    windowEnd: "+010000-11-30"
   });
 });
 
@@ -234,4 +268,76 @@ test("calculatePatternFacts unions actual and planned dates equally", () => {
     calculatePatternFacts(mixedStatuses),
     calculatePatternFacts(actualOnly)
   );
+});
+
+test("budget and rolling-window facts match an independent seeded calendar reference", () => {
+  const dayMs = 86_400_000;
+  const epoch = (date) => Date.parse(date + "T00:00:00Z") / dayMs;
+  const iso = (day) => new Date(day * dayMs).toISOString().split("T")[0];
+  let seed = 0x26af901d;
+  const next = (maximum) => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed % maximum;
+  };
+  const origins = [
+    ["0100-01-01", 450],
+    ["2023-12-25", 450],
+    ["2024-02-20", 450],
+    ["9998-12-25", 370],
+    ["9999-12-15", 17]
+  ];
+
+  for (const [origin, horizon] of origins) {
+    for (let scenario = 0; scenario < 20; scenario += 1) {
+      const firstDay = epoch(origin);
+      const finalDay = firstDay + horizon - 1;
+      const actual = new Set();
+      const planned = new Set();
+      const stays = Array.from({ length: next(9) }, () => {
+        const arrival = firstDay + next(horizon);
+        const departure = arrival + next(Math.min(25, finalDay - arrival + 1));
+        const status = next(2) ? "actual" : "planned";
+        for (let day = arrival; day <= departure; day += 1) {
+          (status === "actual" ? actual : planned).add(day);
+        }
+        return { arrivalDate: iso(arrival), departureDate: iso(departure), status };
+      });
+      const registered = [...new Set([...actual, ...planned])].sort((a, b) => a - b);
+      const periodStart = firstDay + next(horizon);
+      const periodEnd = periodStart + next(finalDay - periodStart + 1);
+      const budgetDays = 1 + next(periodEnd - periodStart + 1);
+      const inside = (day) => day >= periodStart && day <= periodEnd;
+      const included = registered.filter(inside);
+      const budget = calculateBudget({
+        periodStart: iso(periodStart), periodEnd: iso(periodEnd), budgetDays
+      }, stays);
+
+      assert.deepEqual(budget.registeredDates, included.map(iso));
+      assert.equal(budget.actualDays, [...actual].filter(inside).length);
+      assert.equal(budget.plannedDays, [...planned].filter(inside).length);
+      assert.equal(budget.excludedDays, registered.length - included.length);
+      assert.equal(budget.remaining, budgetDays - included.length);
+      assert.equal(budget.lastWithinBudgetDate,
+        included.length >= budgetDays ? iso(included[budgetDays - 1]) : null);
+      assert.equal(budget.firstExceededDate,
+        included.length > budgetDays ? iso(included[budgetDays]) : null);
+
+      let expected = { count: 0, windowStart: null, windowEnd: null };
+      for (const day of registered) {
+        const date = new Date(day * dayMs);
+        const year = date.getUTCFullYear() + 1;
+        const month = date.getUTCMonth();
+        const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        const anniversary = Date.UTC(year, month, Math.min(date.getUTCDate(), lastDay)) / dayMs;
+        const end = anniversary - (month === 1 && date.getUTCDate() === 29 ? 0 : 1);
+        const count = registered.filter((candidate) => candidate >= day && candidate <= end).length;
+        if (count > expected.count) {
+          expected = { count, windowStart: iso(day), windowEnd: iso(end) };
+        }
+      }
+      const facts = calculatePatternFacts(stays);
+      assert.equal(facts.totalDays, registered.length);
+      assert.deepEqual(facts.maxRollingTwelveMonths, expected, origin + ": " + scenario);
+    }
+  }
 });

@@ -31,7 +31,7 @@ export function toEpochDay(date) {
 }
 
 export function fromEpochDay(epochDay) {
-  return new Date(epochDay * DAY_MS).toISOString().slice(0, 10);
+  return new Date(epochDay * DAY_MS).toISOString().split("T")[0];
 }
 
 export function addDays(date, days) {
@@ -44,12 +44,12 @@ export function addMonthsClamped(date, months) {
   const targetMonthIndex = year * 12 + month - 1 + months;
   const targetYear = Math.floor(targetMonthIndex / 12);
   const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
-  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  const targetDay = Math.min(day, lastDay);
+  const targetDate = new Date(0);
+  targetDate.setUTCFullYear(targetYear, targetMonth + 1, 0);
+  const targetDay = Math.min(day, targetDate.getUTCDate());
+  targetDate.setUTCFullYear(targetYear, targetMonth, targetDay);
 
-  return fromEpochDay(
-    Math.floor(Date.UTC(targetYear, targetMonth, targetDay) / DAY_MS)
-  );
+  return fromEpochDay(Math.floor(targetDate.getTime() / DAY_MS));
 }
 
 export function addYearsClamped(date, years) {
@@ -74,7 +74,8 @@ export function eachDateInclusive(startDate, endDate) {
 
 export function rollingYearEnd(startDate) {
   const anniversary = addYearsClamped(startDate, 1);
-  return startDate.endsWith("-02-29") ? anniversary : addDays(anniversary, -1);
+  const anniversaryDay = Date.parse(anniversary + "T00:00:00Z") / DAY_MS;
+  return fromEpochDay(anniversaryDay - (startDate.endsWith("-02-29") ? 0 : 1));
 }
 
 export function todayLocalIso(date = new Date()) {

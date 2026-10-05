@@ -87,6 +87,7 @@ test("controller exposes only the planned use-case API", () => {
 
   assert.deepEqual(Object.keys(controller).sort(), [
     "beginEditProfile",
+    "beginRestore",
     "cancelEditProfile",
     "cancelRestore",
     "clearAll",
@@ -101,7 +102,8 @@ test("controller exposes only the planned use-case API", () => {
     "removeStay",
     "saveProfile",
     "saveStay",
-    "showDemo"
+    "showDemo",
+    "updateToday"
   ]);
 });
 
@@ -581,6 +583,59 @@ test("confirmRestore without explicit confirmation never saves", () => {
   assert.equal(unconfirmed.ok, false);
   assert.equal(unconfirmed.message, "Bekräfta att den aktuella datan ska ersättas.");
   assert.equal(repository.calls.save.length, 0);
+});
+
+test("a failed replacement preview clears the older candidate", () => {
+  const initialState = appState();
+  const repository = fakeRepository({ state: initialState });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+  controller.previewRestore({ raw: backupRaw(restorableState()), fileName: "old.json" });
+
+  const invalid = controller.previewRestore({ raw: "{broken", fileName: "new.json" });
+
+  assert.equal(invalid.ok, false);
+  assert.equal(Object.hasOwn(renders.at(-1), "restorePreview"), false);
+  assert.equal(controller.confirmRestore({ confirmed: true }).ok, false);
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(controller.getSnapshot().state, initialState);
+});
+
+test("reading a backup blocks mutations without making a confirmable candidate", () => {
+  const repository = fakeRepository({ state: appState() });
+  const { controller, renders } = setup({ repository });
+  controller.init();
+  assert.equal(typeof controller.beginRestore, "function");
+
+  controller.beginRestore({ fileName: "slow.json" });
+
+  assert.deepEqual(renders.at(-1).restorePreview, { fileName: "slow.json", loading: true });
+  assert.equal(controller.saveProfile(profile()).ok, false);
+  assert.equal(controller.beginEditProfile().ok, false);
+  assert.equal(controller.confirmRestore({ confirmed: true }).ok, false);
+  assert.equal(repository.calls.save.length, 0);
+  controller.cancelRestore();
+  assert.equal(controller.beginEditProfile().ok, true);
+});
+
+test("updating today's date refreshes passed plans and filenames without saving", () => {
+  const initialState = appState({ stays: [stay("yesterday", {
+    arrivalDate: TODAY,
+    departureDate: TODAY
+  })] });
+  const repository = fakeRepository({ state: initialState });
+  const { controller } = setup({ repository });
+  controller.init();
+  assert.equal(typeof controller.updateToday, "function");
+
+  controller.updateToday("2026-08-17", { publish: false });
+
+  assert.equal(controller.getSnapshot().today, "2026-08-17");
+  assert.equal(controller.getSnapshot().state, initialState);
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(controller.createBackupDownload().download.filename,
+    "sverigevistelseplaneraren-backup-2026-08-17.json");
+  assert.equal(controller.confirmPastPlanned("yesterday").ok, true);
 });
 
 test("cancelRestore clears the preview and preserves current data", () => {

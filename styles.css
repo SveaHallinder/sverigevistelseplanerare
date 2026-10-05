@@ -1219,6 +1219,18 @@ button.stay-row:hover {
   gap: 0.55rem;
 }
 
+.data-tools > .data-tools__feedback {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem;
+  color: var(--ink);
+  background: var(--surface-muted);
+  border-radius: var(--radius-xs);
+}
+
+.data-tools__feedback:empty {
+  display: none;
+}
+
 .data-tools__actions .secondary-button {
   flex: 1 1 auto;
   min-height: 2.75rem;

@@ -19,6 +19,13 @@ test("isIsoDate accepts real ISO calendar dates only", () => {
   assert.equal(isIsoDate("16-08-2026"), false);
 });
 
+test("isIsoDate keeps input years within the supported calendar range", () => {
+  assert.equal(isIsoDate("0100-01-01"), true);
+  assert.equal(isIsoDate("9999-12-31"), true);
+  assert.equal(isIsoDate("0099-12-31"), false);
+  assert.equal(isIsoDate("+010000-01-01"), false);
+});
+
 test("epoch-day conversion round-trips valid dates", () => {
   assert.equal(fromEpochDay(toEpochDay("2026-08-16")), "2026-08-16");
 });
@@ -61,9 +68,25 @@ test("month and year addition clamps to the target month's last day", () => {
   assert.equal(addYearsClamped("2028-02-29", 5), "2033-02-28");
 });
 
+test("month addition does not reinterpret derived years below 100", () => {
+  assert.equal(addMonthsClamped("0100-01-31", -1), "0099-12-31");
+  assert.equal(addMonthsClamped("0100-03-31", -13), "0099-02-28");
+});
+
+test("derived dates above year 9999 retain the complete ISO date", () => {
+  assert.equal(addDays("9999-12-31", 1), "+010000-01-01");
+  assert.equal(addMonthsClamped("9999-08-31", 6), "+010000-02-29");
+  assert.equal(addYearsClamped("9998-01-01", 5), "+010003-01-01");
+});
+
 test("rollingYearEnd handles leap-day and ordinary starts", () => {
   assert.equal(rollingYearEnd("2024-02-29"), "2025-02-28");
   assert.equal(rollingYearEnd("2025-03-01"), "2026-02-28");
+});
+
+test("rollingYearEnd preserves twelve-month boundaries above year 9999", () => {
+  assert.equal(rollingYearEnd("9999-07-01"), "+010000-06-30");
+  assert.equal(rollingYearEnd("9999-12-31"), "+010000-12-30");
 });
 
 test("todayLocalIso uses local date parts from the injected date", () => {

@@ -64,6 +64,48 @@ test("getStayDaySets deduplicates dates while actual status wins overlaps", () =
   assert.deepEqual(stays, before);
 });
 
+test("getStayDaySets preserves same-status unions and cross-status overlap", () => {
+  const stays = [
+    { arrivalDate: "2028-03-01", departureDate: "2028-03-03", status: "planned" },
+    { arrivalDate: "2028-02-28", departureDate: "2028-03-01", status: "actual" },
+    { arrivalDate: "2028-02-29", departureDate: "2028-03-02", status: "planned" },
+    { arrivalDate: "2028-02-28", departureDate: "2028-02-29", status: "actual" }
+  ];
+  const before = structuredClone(stays);
+  const result = getStayDaySets(stays);
+
+  assert.deepEqual([...result.actualDates].sort(), ["2028-02-28", "2028-02-29", "2028-03-01"]);
+  assert.deepEqual([...result.plannedDates].sort(), ["2028-02-29", "2028-03-01", "2028-03-02", "2028-03-03"]);
+  assert.deepEqual([...result.uniqueDates].sort(), ["2028-02-28", "2028-02-29", "2028-03-01", "2028-03-02", "2028-03-03"]);
+  assert.equal(result.statusByDate["2028-02-29"], "actual");
+  assert.equal(result.statusByDate["2028-03-03"], "planned");
+  assert.deepEqual(stays, before);
+});
+
+test("getStayDaySets bounds calendar work by unique dates for repeated stays", (context) => {
+  const stays = Array.from({ length: 100 }, () => ({
+    arrivalDate: "2026-01-01",
+    departureDate: "2026-12-31",
+    status: "actual"
+  }));
+  const utc = Date.UTC;
+  let calendarCalls = 0;
+  context.mock.method(Date, "UTC", (...args) => {
+    calendarCalls += 1;
+    return utc(...args);
+  });
+
+  const result = getStayDaySets(stays);
+
+  assert.equal(result.actualDates.size, 365);
+  assert.equal(result.uniqueDates.size, 365);
+  assert.equal(result.plannedDates.size, 0);
+  assert.ok(
+    calendarCalls <= result.uniqueDates.size * 8 + stays.length * 8,
+    "Överlappande vistelser ska inte upprepa kalenderarbetet för varje råintervall."
+  );
+});
+
 test("summarizePeriod counts actual and planned overlaps separately", () => {
   const result = summarizePeriod([
     {
@@ -154,6 +196,13 @@ test("mergeRegisteredIntervals merges overlap and direct adjacency without mutat
   ]);
   assert.deepEqual(stays, before);
   assert.deepEqual(mergeRegisteredIntervals([]), []);
+});
+
+test("mergeRegisteredIntervals merges overlap at the final supported date", () => {
+  assert.deepEqual(mergeRegisteredIntervals([
+    { arrivalDate: "9999-12-30", departureDate: "9999-12-31" },
+    { arrivalDate: "9999-12-31", departureDate: "9999-12-31" }
+  ]), [{ arrivalDate: "9999-12-30", departureDate: "9999-12-31" }]);
 });
 
 test("getPastPlannedStays excludes today and sorts past plans by departure", () => {

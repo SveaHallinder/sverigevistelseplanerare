@@ -2,7 +2,7 @@ import { calculateBudget } from "../domain/budget.js";
 import { buildBudgetExplanation } from "../domain/budget-explanation.js";
 import { addDays, isIsoDate } from "../domain/dates.js";
 import { buildObservations } from "../domain/observations.js";
-import { getPastPlannedStays } from "../domain/stays.js";
+import { getPastPlannedStays, getStayDaySets, mergeRegisteredIntervals } from "../domain/stays.js";
 import { LEGAL_SOURCES } from "../legal-content.js";
 import { renderBudgetExplanation } from "./budget-explanation.js";
 import { renderDataTools } from "./data-tools.js";
@@ -109,8 +109,14 @@ export function buildCockpitModel(state, {
   demo = false,
   restorePreview = null
 }) {
-  const budget = calculateBudget(state.profile, state.stays);
+  const budget = calculateBudget(state.profile, state.stays, { expandDates: false });
   const firstDateOfYear = iso(year, 1, 1);
+  const lastDateOfYear = iso(year, 12, 31);
+  const calendarStays = state.stays.flatMap((stay) => {
+    const arrivalDate = stay.arrivalDate > firstDateOfYear ? stay.arrivalDate : firstDateOfYear;
+    const departureDate = stay.departureDate < lastDateOfYear ? stay.departureDate : lastDateOfYear;
+    return arrivalDate <= departureDate ? [{ ...stay, arrivalDate, departureDate }] : [];
+  });
   const requestedFocus = focusedDate ?? today;
   const focus = dateBelongsToYear(requestedFocus, year)
     ? requestedFocus
@@ -124,7 +130,7 @@ export function buildCockpitModel(state, {
     explanation: buildBudgetExplanation(state.profile, state.stays),
     observations: buildObservations(state.profile, state.stays),
     pastPlanned: getPastPlannedStays(state.stays, today),
-    statusByDate: budget.statusByDate,
+    statusByDate: getStayDaySets(calendarStays).statusByDate,
     year,
     focusedDate: focus,
     calendarView,
@@ -273,7 +279,11 @@ function renderBudgetStatus(model) {
   const fill = Math.min(100, Math.round(
     (model.budget.uniqueDays / model.profile.budgetDays) * 100
   ));
-  const excludedIntervals = mergeDates(model.budget.excludedDates);
+  const excludedIntervals = model.budget.excludedRanges
+    ? mergeRegisteredIntervals(model.budget.excludedRanges.map((range) => ({
+      arrivalDate: range.startDate, departureDate: range.endDate
+    })))
+    : mergeDates(model.budget.excludedDates);
   const excluded = model.budget.excludedDays > 0
     ? '<p class="budget-status__excluded">' +
       escapeHtml(model.budget.excludedDays === 1
@@ -359,7 +369,8 @@ export function renderCockpit(model) {
     renderBudgetExplanation(model.explanation) +
     "</section>" +
     (model.demo ? "" : '<p class="local-notice">' +
-      (model.storageIssue ? "Kontrollera lagringsmeddelandet ovan. " : "Sparas i den här webbläsaren. ") +
+      (model.storageIssue ? "Kontrollera lagringsmeddelandet ovan. "
+        : model.native ? "Sparas lokalt i appen. " : "Sparas i den här webbläsaren. ") +
       'Ingen automatisk synk mellan enheter. <a href="#data-tools-heading">Spara en backup</a>.</p>') +
     '<div class="cockpit-layout' + (model.calendarView === "year" ? " cockpit-layout--year" : "") +
     '"><section class="aside-card stay-panel">' +
@@ -377,7 +388,8 @@ export function renderCockpit(model) {
       ? ""
       : renderDataTools({
           restorePreview: model.restorePreview,
-          canExport: true
+          canExport: true,
+          native: model.native
         })) +
     "</div>" + footer + "</div></div>";
 }

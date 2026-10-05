@@ -807,10 +807,13 @@ function actionTarget(action, dataset = {}) {
 
 function fakeBrowserDocument() {
   const app = new FakeEventRoot();
+  const dataToolsFeedback = { textContent: "" };
   app.focusedSelectors = [];
+  app.actualFocusSelectors = [];
   app.querySelector = (selector) => {
+    if (selector === "[data-tools-feedback]") return dataToolsFeedback;
     app.focusedSelectors.push(selector);
-    return { focus() {}, isConnected: true };
+    return { focus() { app.actualFocusSelectors.push(selector); }, isConnected: true };
   };
   const arrival = { focus() {}, isConnected: true };
   const dialog = new FakeEventRoot();
@@ -834,6 +837,7 @@ function fakeBrowserDocument() {
     app,
     dialog,
     liveRegion,
+    dataToolsFeedback,
     documentRef: {
       querySelector(selector) {
         return nodes[selector] ?? null;
@@ -912,7 +916,7 @@ function profileForm(fields) {
   };
 }
 
-function createTestBrowserApp(state = cockpitState(), repositoryOptions = {}) {
+function createTestBrowserApp(state = cockpitState(), repositoryOptions = {}, browserOptions = {}) {
   assert.equal(typeof createBrowserApp, "function", "createBrowserApp ska exporteras");
   const browser = fakeBrowserDocument();
   const repository = browserRepository(state, repositoryOptions);
@@ -937,7 +941,8 @@ function createTestBrowserApp(state = cockpitState(), repositoryOptions = {}) {
     now: () => "2026-08-16T12:00:00.000Z",
     makeId: () => "browser-stay",
     readFileText,
-    downloadFile
+    downloadFile,
+    ...browserOptions
   });
   return {
     ...browser,
@@ -1001,6 +1006,343 @@ async function chooseRestoreFile(app, file) {
   await app.dispatchAsync("change", { target: input });
   return input;
 }
+
+function deferredRead() {
+  let resolve;
+  let reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+test("main confirms only the most recently selected backup when reads finish out of order", async () => {
+  const firstRead = deferredRead();
+  const secondRead = deferredRead();
+  const { app, repository } = createTestBrowserApp(cockpitState(), {}, {
+    readFileText: (file) => file.name === "A.json" ? firstRead.promise : secondRead.promise
+  });
+  const first = chooseRestoreFile(app, restoreFile({ name: "A.json" }));
+  const second = chooseRestoreFile(app, restoreFile({ name: "B.json" }));
+  const backupB = restorableAppState();
+  backupB.profile.budgetDays = 9;
+  secondRead.resolve(serializeAppState(backupB));
+  await second;
+  firstRead.resolve(serializeAppState(restorableAppState()));
+  await first;
+
+  assert.match(app.innerHTML, /B\.json/);
+  assert.doesNotMatch(app.innerHTML, /A\.json/);
+  app.dispatch("click", { target: actionTarget("confirm-restore") });
+  assert.equal(repository.calls.save.length, 1);
+  assert.equal(repository.calls.save[0].profile.budgetDays, 9);
+});
+
+test("main discards a previous candidate when a new file is invalid, oversized or unreadable", async (context) => {
+  for (const invalidFile of [
+    restoreFile({ name: "invalid.json", contents: "{broken" }),
+    restoreFile({ name: "large.json", size: 1_048_577 }),
+    restoreFile({ name: "unreadable.json", unreadable: true })
+  ]) {
+    await context.test(invalidFile.name, async () => {
+      const state = cockpitState();
+      const { app, repository, api, liveRegion, dataToolsFeedback } = createTestBrowserApp(state);
+      await chooseRestoreFile(app, restoreFile());
+      await chooseRestoreFile(app, invalidFile);
+
+      assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+      assert.equal(dataToolsFeedback.textContent, liveRegion.textContent);
+      assert.ok(dataToolsFeedback.textContent.length > 0);
+      app.dispatch("click", { target: actionTarget("confirm-restore") });
+      assert.equal(repository.calls.save.length, 0);
+      assert.equal(api.controller.getSnapshot().state, state);
+    });
+  }
+});
+
+test("main cancel invalidates an in-flight file read", async () => {
+  const read = deferredRead();
+  const { app, repository } = createTestBrowserApp(cockpitState(), {}, {
+    readFileText: () => read.promise
+  });
+  const pending = chooseRestoreFile(app, restoreFile());
+  assert.match(app.innerHTML, /Kontrollerar backupfilen/);
+  assert.match(app.innerHTML, /data-action="cancel-restore"/);
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+  app.dispatch("click", { target: actionTarget("cancel-restore") });
+  read.resolve(serializeAppState(restorableAppState()));
+  await pending;
+
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+  assert.doesNotMatch(app.innerHTML, /Kontrollerar backupfilen/);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("main ignores a superseded read failure without clearing the newest preview", async () => {
+  const older = deferredRead();
+  const { app, liveRegion } = createTestBrowserApp(cockpitState(), {}, {
+    readFileText: (file) => file.name === "old.json"
+      ? older.promise : Promise.resolve(file.contents)
+  });
+  const pending = chooseRestoreFile(app, restoreFile({ name: "old.json" }));
+  await chooseRestoreFile(app, restoreFile({ name: "new.json" }));
+  older.reject(new Error("private file details"));
+  await pending;
+
+  assert.match(app.innerHTML, /new\.json/);
+  assert.equal(liveRegion.textContent, "Backupfilen är kontrollerad.");
+});
+
+test("renderDataTools provides visible file feedback and no invisible tab stop", () => {
+  const html = renderDataTools();
+  assert.match(html, /<p[^>]*data-tools-feedback/);
+  assert.match(html, /<input[^>]*type="file"[^>]*hidden[^>]*tabindex="-1"/);
+});
+
+test("main refreshes the device date on a user action after midnight", () => {
+  let currentDate = "2026-08-16";
+  const state = cockpitState({ stays: [{
+    ...cockpitState().stays[1],
+    arrivalDate: currentDate,
+    departureDate: currentDate
+  }] });
+  const { app, dialog, api, downloads } = createTestBrowserApp(state, {}, {
+    getToday: () => currentDate
+  });
+  currentDate = "2026-08-17";
+
+  app.dispatch("click", { target: actionTarget("toggle-calendar") });
+
+  assert.equal(api.controller.getSnapshot().today, currentDate);
+  assert.match(app.innerHTML, /Genomfördes den här planerade vistelsen/);
+  app.dispatch("click", { target: actionTarget("add-stay") });
+  assert.match(dialog.innerHTML, /name="arrivalDate"[^>]*value="2026-08-17"/);
+  app.dispatch("click", { target: actionTarget("download-backup") });
+  assert.equal(downloads[0].filename, "sverigevistelseplaneraren-backup-2026-08-17.json");
+});
+
+test("main refreshes on foreground without replacing unsaved profile inputs", () => {
+  let currentDate = "2026-08-16";
+  const lifecycle = new FakeEventRoot();
+  const { app, api } = createTestBrowserApp(cockpitState(), {}, {
+    getToday: () => currentDate,
+    windowRef: lifecycle
+  });
+  app.dispatch("click", { target: actionTarget("edit-profile") });
+  app.innerHTML = "unsaved profile inputs";
+  currentDate = "2026-08-17";
+
+  lifecycle.dispatch("focus", {});
+
+  assert.equal(api.controller.getSnapshot().today, currentDate);
+  assert.equal(app.innerHTML, "unsaved profile inputs");
+});
+
+test("main refreshes on foreground without replacing an open stay draft", () => {
+  let currentDate = "2026-08-16";
+  const lifecycle = new FakeEventRoot();
+  const { app, dialog, api } = createTestBrowserApp(cockpitState(), {}, {
+    getToday: () => currentDate,
+    windowRef: lifecycle
+  });
+  app.dispatch("click", { target: actionTarget("add-stay") });
+  dialog.innerHTML = "unsaved stay inputs";
+  currentDate = "2026-08-17";
+
+  lifecycle.dispatch("focus", {});
+
+  assert.equal(api.controller.getSnapshot().today, currentDate);
+  assert.equal(dialog.innerHTML, "unsaved stay inputs");
+});
+
+test("main returns focus after saving and cancelling profile settings", () => {
+  const { app } = createTestBrowserApp(cockpitState());
+  app.dispatch("click", { target: actionTarget("edit-profile") });
+  assert.equal(app.actualFocusSelectors.at(-1), '[name="departureDate"]');
+  app.dispatch("click", { target: actionTarget("cancel-edit-profile") });
+  assert.equal(app.actualFocusSelectors.at(-1), '[data-action="edit-profile"]');
+  app.dispatch("click", { target: actionTarget("edit-profile") });
+  withFormData(() => app.dispatch("submit", {
+    target: profileForm(cockpitState().profile),
+    preventDefault() {}
+  }));
+  assert.equal(app.actualFocusSelectors.at(-1), '[data-action="add-stay"]');
+});
+
+test("main cannot open a clear-data confirmation during restore", async () => {
+  const { app } = createTestBrowserApp(cockpitState());
+  await chooseRestoreFile(app, restoreFile());
+  app.dispatch("click", { target: actionTarget("request-clear") });
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-clear"/);
+  assert.match(app.innerHTML, /data-action="confirm-restore"/);
+});
+
+test("main uses native file selection but still requires restore confirmation", async () => {
+  const file = restoreFile();
+  const { app, repository } = createTestBrowserApp(cockpitState(), {}, {
+    chooseBackupFile: async () => file
+  });
+  await app.dispatchAsync("click", { target: actionTarget("choose-restore") });
+  assert.match(app.innerHTML, /data-action="confirm-restore"/);
+  assert.equal(repository.calls.save.length, 0);
+  app.dispatch("click", { target: actionTarget("confirm-restore") });
+  assert.equal(repository.calls.save.length, 1);
+});
+
+test("main native import cancellation discards an old restore candidate", async () => {
+  const { app, api, repository, dataToolsFeedback } = createTestBrowserApp(cockpitState(), {}, {
+    chooseBackupFile: async () => null
+  });
+  await chooseRestoreFile(app, restoreFile());
+  await app.dispatchAsync("click", { target: actionTarget("choose-restore") });
+  assert.equal(Boolean(api.controller.getSnapshot().restorePreview), false);
+  assert.equal(repository.calls.save.length, 0);
+  assert.equal(dataToolsFeedback.textContent, "Återställningen har avbrutits.");
+});
+
+test("main cannot reopen a cancelled native import when its picker finishes later", async () => {
+  const picker = deferredRead();
+  const { app, repository } = createTestBrowserApp(cockpitState(), {}, {
+    chooseBackupFile: () => picker.promise
+  });
+  const choosing = app.dispatchAsync("click", { target: actionTarget("choose-restore") });
+  app.dispatch("click", { target: actionTarget("cancel-restore") });
+  picker.resolve(restoreFile());
+  await choosing;
+  assert.doesNotMatch(app.innerHTML, /data-action="confirm-restore"/);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("main awaits export completion and reports cancellation without success", async () => {
+  const exportResult = deferredRead();
+  const { app, dataToolsFeedback, repository } = createTestBrowserApp(cockpitState(), {}, {
+    downloadFile: () => exportResult.promise
+  });
+  const downloading = app.dispatchAsync("click", { target: actionTarget("download-backup") });
+  assert.equal(dataToolsFeedback.textContent, "");
+  exportResult.resolve({ cancelled: true });
+  await downloading;
+  assert.match(dataToolsFeedback.textContent, /avbröts/);
+  assert.doesNotMatch(dataToolsFeedback.textContent, /^Filen har exporterats|har laddats ner/);
+  assert.equal(repository.calls.save.length, 0);
+});
+
+test("main displays async export success and failure explicitly", async (context) => {
+  await context.test("completed", async () => {
+    const { app, dataToolsFeedback } = createTestBrowserApp(cockpitState(), {}, {
+      downloadFile: async () => ({ message: "Filen har exporterats." })
+    });
+    await app.dispatchAsync("click", { target: actionTarget("download-csv") });
+    assert.equal(dataToolsFeedback.textContent, "Filen har exporterats.");
+  });
+  await context.test("failed", async () => {
+    const { app, dataToolsFeedback } = createTestBrowserApp(cockpitState(), {}, {
+      downloadFile: async () => { throw new Error("private path"); }
+    });
+    await app.dispatchAsync("click", { target: actionTarget("download-backup") });
+    assert.match(dataToolsFeedback.textContent, /kunde inte/);
+    assert.doesNotMatch(dataToolsFeedback.textContent, /private path/);
+  });
+});
+
+test("main leaves non-calendar keyboard targets connected across midnight", () => {
+  let currentDate = "2026-08-16";
+  const { app } = createTestBrowserApp(cockpitState(), {}, { getToday: () => currentDate });
+  let renders = 0;
+  const originalHtml = app.innerHTML;
+  Object.defineProperty(app, "innerHTML", {
+    get: () => originalHtml,
+    set: () => { renders += 1; }
+  });
+  const target = { closest: () => null };
+  currentDate = "2026-08-17";
+  for (const key of ["Enter", " ", "Tab"]) app.dispatch("keydown", { target, key });
+  assert.equal(renders, 0);
+});
+
+test("main keeps the same stay or calendar day focused when the date refreshes", async (context) => {
+  for (const datasets of [
+    [{ action: "edit-stay", stayId: "first" }, { action: "edit-stay", stayId: "second" }],
+    [{ action: "select-date", date: "2026-08-01" }, { action: "select-date", date: "2026-08-16" }]
+  ]) {
+    await context.test(datasets[0].action, () => {
+      let currentDate = "2026-08-16";
+      const lifecycle = new FakeEventRoot();
+      const { app, documentRef } = createTestBrowserApp(cockpitState(), {}, {
+        getToday: () => currentDate, windowRef: lifecycle
+      });
+      let focused;
+      app.querySelectorAll = () => datasets.map((dataset, index) => ({
+        dataset, focus() { focused = index; }
+      }));
+      documentRef.activeElement = { dataset: datasets[1] };
+      currentDate = "2026-08-17";
+      lifecycle.dispatch("focus", {});
+      assert.equal(focused, 1);
+    });
+  }
+});
+
+test("main preserves an unsaved profile form through failed and cancelled imports", async (context) => {
+  for (const state of [cockpitState(), null]) {
+    await context.test(state ? "profile settings" : "first plan", async () => {
+      const { app, repository } = createTestBrowserApp(state);
+      if (state) app.dispatch("click", { target: actionTarget("edit-profile") });
+      app.innerHTML = "unsaved form including invalid values and expanded questions";
+      const originalQuery = app.querySelector;
+      const form = profileForm({ budgetDays: "unfinished" });
+      const dataTools = { outerHTML: "" };
+      app.querySelector = (selector) => selector === '[data-form="profile"]'
+        ? form : selector === ".data-tools" ? dataTools : originalQuery(selector);
+
+      await chooseRestoreFile(app, restoreFile({ contents: "{broken" }));
+      assert.equal(app.innerHTML, "unsaved form including invalid values and expanded questions");
+      await chooseRestoreFile(app, restoreFile());
+      assert.match(dataTools.outerHTML, /data-action="confirm-restore"/);
+      app.dispatch("click", { target: actionTarget("cancel-restore") });
+      assert.equal(app.innerHTML, "unsaved form including invalid values and expanded questions");
+      assert.equal(repository.calls.save.length, 0);
+    });
+  }
+});
+
+test("main keeps successful restore feedback visible after the final calendar render", async () => {
+  const { app } = createTestBrowserApp(cockpitState());
+  const originalQuery = app.querySelector;
+  let feedback = { textContent: "" };
+  let html = app.innerHTML;
+  Object.defineProperty(app, "innerHTML", {
+    get: () => html,
+    set: (value) => { html = value; feedback = { textContent: "" }; }
+  });
+  app.querySelector = (selector) => selector === "[data-tools-feedback]" ? feedback : originalQuery(selector);
+  await chooseRestoreFile(app, restoreFile());
+  app.dispatch("click", { target: actionTarget("confirm-restore") });
+  assert.equal(feedback.textContent, "Backupen har återställts.");
+});
+
+test("main detects the native host and shares web import validation", async () => {
+  const state = restorableAppState();
+  const { app, repository, dataToolsFeedback } = createTestBrowserApp(cockpitState(), {}, {
+    readFileText: undefined,
+    downloadFile: undefined,
+    windowRef: { webkit: { messageHandlers: { sverigeNative: {
+      async postMessage(message) {
+        return message.action === "import"
+          ? { ok: true, file: { name: "native.json", size: 500, content: serializeAppState(state) } }
+          : { ok: true };
+      }
+    } } } }
+  });
+  await app.dispatchAsync("click", { target: actionTarget("choose-restore") });
+  assert.match(app.innerHTML, /native\.json/);
+  assert.equal(repository.calls.save.length, 0);
+  app.dispatch("click", { target: actionTarget("confirm-restore") });
+  assert.deepEqual(repository.calls.save[0], state);
+  await app.dispatchAsync("click", { target: actionTarget("download-backup") });
+  assert.equal(dataToolsFeedback.textContent, "Filen har exporterats.");
+});
 
 test("renderDataTools escapes the preview filename and offers explicit actions", () => {
   assert.equal(typeof renderDataTools, "function", "renderDataTools ska exporteras");

@@ -13,6 +13,14 @@ function escapeHtml(value) {
 
 function renderPreview(preview) {
   if (!preview) return "";
+  if (preview.loading) {
+    return '<section class="inline-confirm" aria-labelledby="restore-heading">'
+      + '<h3 id="restore-heading">Kontrollerar backupfilen…</h3>'
+      + "<p>" + escapeHtml(preview.fileName) + "</p>"
+      + "<p>Din nuvarande data har inte ändrats.</p>"
+      + '<button class="secondary-button" type="button" '
+      + 'data-action="cancel-restore">Avbryt</button></section>';
+  }
   const stayCount = preview.stayCount === 1
     ? "1 vistelse"
     : preview.stayCount + " vistelser";
@@ -39,11 +47,12 @@ function renderPreview(preview) {
 
 export function renderDataTools({
   restorePreview = null,
-  canExport = true
+  canExport = true,
+  native = false
 } = {}) {
   const exportActions = canExport
     ? '<button type="button" class="secondary-button" '
-      + 'data-action="download-backup">Ladda ner backup</button>'
+      + 'data-action="download-backup">' + (native ? "Spara backup" : "Ladda ner backup") + "</button>"
       + '<button type="button" class="secondary-button" '
       + 'data-action="download-csv">Exportera CSV</button>'
     : "";
@@ -57,7 +66,8 @@ export function renderDataTools({
     + exportActions
     + '<button type="button" class="secondary-button" '
     + 'data-action="choose-restore">Återställ backup</button>'
-    + '<input class="sr-only" type="file" '
+    + '<input type="file" hidden tabindex="-1" aria-label="Välj JSON-backup" '
     + 'accept=".json,application/json" data-file-input="restore">'
-    + "</div>" + renderPreview(restorePreview) + "</section>";
+    + '</div><p class="data-tools__feedback" data-tools-feedback></p>'
+    + renderPreview(restorePreview) + "</section>";
 }
