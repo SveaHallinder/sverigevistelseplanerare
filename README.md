@@ -1,10 +1,10 @@
 # Sverigevistelseplaneraren
 
-En lokal MVP för att dokumentera och planera registrerade Sverigedagar.
+Ett lokalt verktyg för att dokumentera och planera registrerade Sverigedagar, med webbversion och ett native testbygge för iPhone/iPad.
 
 ## Förutsättning
 
-Node.js 20 eller senare är den enda förutsättningen.
+Webbversionen kräver Node.js 20 eller senare för utveckling och tester. Inga tredjepartspaket behövs. Nativebygget kräver fullständigt Xcode.
 
 ## Starta lokalt
 
@@ -32,13 +32,31 @@ Förhandsgranska den byggda kopian med `npm run preview`. Observera att `scripts
 
 ## Webbläsarstöd
 
-Testad i Chromium. Koden använder `dialog.showModal()`, `Array.prototype.at`, `String.prototype.replaceAll`, `File.text()` och `Intl.DateTimeFormat` med `timeZone`, vilket ger baslinjen **Safari 15.4+, Firefox 98+ och Chrome 92+**. `crypto.randomUUID` och `showModal` anropas bakom funktionskontroller och har fallback.
+Det aktuella webbflödet är testat i Chrome. Koden har fallback för bland annat `crypto.randomUUID` och `showModal`; en API-baslinje är inte samma sak som verifierat stöd på en viss enhet.
 
-Se `docs/qa/localhost.md` för den manuella webbläsarmatrisen som återstår.
+Se [localhost-QA](docs/qa/localhost.md) för verifierade resultat och kvarvarande kompatibilitetskontroller.
+
+## Native testbygge
+
+~~~bash
+node scripts/build-ios.mjs
+~~~
+
+Kommandot paketerar samma webbgränssnitt och beräkningar i `native/ios/Web/` och bygger ett osignerat iOS Simulator-bygge. Projektet har en delad Xcode-scheme för iPhone och iPad, deployment target iOS 16. Ingen simulatorruntime hämtas automatiskt.
+
+För lokal körning på Mac via Mac Catalyst:
+
+~~~bash
+node scripts/build-ios.mjs --catalyst
+~~~
+
+Öppna `native/ios/build-catalyst/Build/Products/Debug-maccatalyst/Sverigevistelseplaneraren.app`. Nativeappen läser bundlade resurser, sparar lokalt och använder systemets filväljare för JSON-backup och CSV. Import valideras med samma regler som i webben och kräver separat bekräftelse. `--stage-only` uppdaterar enbart de bundlade webbfilerna.
+
+Se [lanseringsunderlaget](docs/release/readiness.md) för signerad distribution, iPhone/iPad-QA och publiceringsuppgifter som återstår. Ett kompilerat testbygge är inte ett App Store-godkännande.
 
 ## Data och MVP-gräns
 
-Data sparas lokalt i den aktuella webbläsaren. Rensa all lokal appdata genom att klicka på **Rensa all data** i UI:t och bekräfta rensningen.
+Data sparas lokalt i den aktuella webbläsaren eller nativeappen, med separata lagringsytor. Rensa all lokal appdata genom att klicka på **Rensa all data** i UI:t och bekräfta rensningen.
 
 Cockpiten visar hur registrerade dagar, överlapp, exkluderade datum och personliga budgetgränser har räknats.
 
@@ -49,6 +67,8 @@ Dagbudgeten väljs aktivt när en plan skapas. Vistelsedialogen visar hela viste
 Under "Din data" kan användaren ladda ner en lokal JSON-backup, återställa en validerad backup efter uttrycklig bekräftelse och exportera vistelser som CSV. Filerna skickas inte till en server.
 
 Verktyget fastslår inte skattehemvist eller juridisk säkerhet och ersätter inte individuell juridisk rådgivning. Konto och molnsynk ingår inte i MVP:n.
+
+Sverigedagar räknas på samma sätt oavsett svensk stad. Verktyget lagrar inga stadsuppgifter och använder ingen platsbehörighet. Datumräkningen använder UTC-kalenderdagar; dagens datum hämtas från enhetens lokala datum och uppdateras när appen åter blir aktiv. Utländska skatte- eller vistelseregler ingår inte.
 
 ## Fortsatt utveckling med Claude
 
@@ -61,6 +81,8 @@ Båda tidigare sprintplanerna är genomförda:
 
 Referenser:
 
+- [Pågående kommersiell hårdsäkring och nativepaket](docs/superpowers/plans/2026-10-05-commercial-readiness.md)
+- [Produktdemo och lanseringsstatus](docs/release/readiness.md)
 - [Aktuellt localhost-QA](docs/qa/localhost.md)
 - [Implementerad MVP-design](docs/superpowers/specs/2026-08-16-sverigevistelseplanerare-design.md)
 - [Historisk MVP-plan](docs/superpowers/plans/2026-08-16-sverigevistelseplanerare-mvp.md)
@@ -71,4 +93,4 @@ Starta `claude` i repots rot och skriv:
 Läs CLAUDE.md och docs/handoff/CURRENT.md. Den lokala användarupplevelsen är uppdaterad. Kör npm run check och följ kvarvarande QA; bygg inte om redan färdiga sprintar.
 ~~~
 
-Lokal QA och kvarvarande begränsningar finns i `docs/qa/localhost.md`. Safari, Firefox och full juridisk källverifiering återstår före extern lansering. Konto och molnsynk ligger efter den lokala betan.
+Lokal QA och kvarvarande begränsningar finns i `docs/qa/localhost.md`. App Store-publicering kräver bland annat verifiering på iPhone/iPad, utgivarens signering, support och publicerad integritetspolicy. Full juridisk källverifiering och extern granskning återstår. Konto och molnsynk ligger efter den lokala betan.

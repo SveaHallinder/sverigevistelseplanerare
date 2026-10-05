@@ -4,6 +4,22 @@ Updated: 2026-10-05
 
 ## Current state
 
+Product commit: `2c0a8a836646e7a61a4da1bdd7b0e69fb5e88957` (`2c0a8a8`) on `design/apple-esque-makeover`. Baseline was `76039a4`. Fresh `npm run check` passes lint, 417 tests and build; the staged product diff passed `git diff --check`. No third-party dependency, persisted schema, cloud service, payment flow or legal rule was added.
+
+The current hardening fixes restore races, stale confirmation candidates, visible file feedback, preserved profile drafts and foreground/local-day refresh. Numerical date arithmetic handles the accepted 0100–9999 bounds and derived dates beyond them. Budget/preview/explanation and rolling-window facts use compact intervals in the UI; the calendar expands only its selected year. The expanded library API remains available. Do not undo the full-range regression or the leap-year rolling-window candidate.
+
+Calculation review passed 1,402 independent cases plus 30 model checks, a separate 3,000-case rolling reference and 48 tests in each of five time zones. The 0100–9999 stay rendered and previewed in Chrome without expanding its 3,615,900 days. These are mathematical checks, not legal acceptance. The temporary-break `||` rule and `reviewedAt` are unchanged.
+
+Final `dist/` Chrome QA on port 4175 passed first-start demo, empty-budget validation/focus, new profile/empty state, actual/planned overlap, invalid departure, editing, unsaved profile draft through invalid file, restore blocking/cancel/reselect/confirmation, year navigation and reload. Counts are 2 actual / 5 planned / 6 unique after restoring the canonical synthetic plan. No app console errors/warnings were observed. The same public source passed 320/390/768/1440 px checks on the separate 4176 origin.
+
+An offline native iPhone/iPad prototype now exists under `native/ios/`; `node scripts/build-ios.mjs` compiles an unsigned generic iOS Simulator bundle. `--catalyst` compiles a local Mac test host. Both passed with Xcode 27, and all 23 public web files matched source bytes in both bundles and `dist/`. Mac UI proved native JSON import/confirmation, oversized-file rejection, JSON/CSV export bytes, export cancellation, native data information and restart persistence. Final clean Catalyst relaunch also displayed the saved plan. One earlier white screenshot with functioning AX was not reproduced in the bounded retest; geometry was positive/attached/visible and no layout patch was justified. This observation remains documented; temporary instrumentation was removed.
+
+No usable iOS simulator runtime or distribution identity was present. Download/install approval for Apple's runtime and the actual publisher/team/support/privacy inputs were asked asynchronously and are still pending. Do not silently download several GB, fabricate seller identity or policy URLs, or treat compile/Mac QA as signed iPhone/iPad or App Store acceptance. The default scope remains Sweden days in any Swedish city; foreign-country rules and city metadata were not invented while the scope question awaits a reply.
+
+Read `docs/qa/localhost.md` for the six-step QA and exact boundaries, `docs/release/readiness.md` for the buyer demo and store draft, and `docs/superpowers/plans/2026-10-05-commercial-readiness.md` for completed and pending gates. Real usability testing, actual 200-percent zoom, signed target devices/providers, two full official legal pages, legal review and Apple review remain open. The local package is reviewable and demoable; it is not an approved or live store release.
+
+## Previous local UX and file QA (2026-09-07 to 2026-10-05)
+
 The approved local launch UX is implemented on `design/apple-esque-makeover`, with no dependency, storage schema or legal calculation changes. Month view opens on the budget period (or today within it); year view is optional. Registered days open an editor or an overlap chooser. Mobile shows stays before the calendar. Onboarding requires an actively chosen budget; previews explain new unique days, overlap and excluded dates. Local storage and backup are visible in the overview.
 
 The follow-up UI polish gives remaining/over-budget days visual priority, keeps three compact summary counts, moves registered boundary dates into the calculation disclosure, and increases muted text contrast. Stay previews show the balance and excluded-date notice immediately, with arithmetic under a disclosure. The form scrolls independently of its save footer; changing status restores focus to the checked radio.
@@ -63,6 +79,9 @@ Primary source: <https://www4.skatteverket.se/rattsligvagledning/edition/2026.7/
 | Backup/CSV codecs | `src/data-transfer.js` |
 | Calculation disclosure markup | `src/ui/budget-explanation.js` |
 | Backup, restore and export controls | `src/ui/data-tools.js` |
+| Browser/native file bridge | `src/native-files.js` |
+| Native local resources, file access and SwiftUI host | `native/ios/Sverigevistelseplaneraren/` |
+| Native resource staging and unsigned builds | `scripts/build-ios.mjs` |
 | Regression contracts | `test/` |
 
 ## COMPLETED_WORK
@@ -100,8 +119,10 @@ Two smaller judgement calls: the disclosure uses `min-height: 2.75rem` instead o
 
 Remaining, in this order:
 
-1. Try the local beta with users using the five-task script in `docs/qa/localhost.md`, and complete the remaining zoom and source checks. Chrome file QA is complete; the Safari/Firefox matrix is for future compatibility testing.
-2. Account and cloud sync only after a separate product decision. Web Storage limits documented below are the reason multi-device synchronization cannot be faked locally.
+1. Resolve the pending iOS runtime/install and publisher inputs, then test the exact build on iPhone/iPad, including dates, restart/update, VoiceOver, Dynamic Type and file providers. Keep signed sandbox and the documented white-capture observation in that acceptance pass.
+2. Try the local beta with users using the six-step script in `docs/qa/localhost.md`, and complete the remaining zoom and source/legal review. Chrome file QA is complete; Safari/Firefox is a separate future compatibility matrix.
+3. Complete real support/privacy pages, metadata/screenshots, rights/license and commercial decisions with the actual owner before a binding sale or store submission. The buyer demo and draft requirements are in `docs/release/readiness.md`.
+4. Account and cloud sync only after a separate product decision. Web Storage limits documented below are the reason multi-device synchronization cannot be faked locally.
 
 Nothing here is deployed and no external legal review has been performed. The local UI work does not authorize new backend infrastructure.
 
@@ -142,7 +163,7 @@ claude
 Paste:
 
 ```text
-Läs CLAUDE.md och docs/handoff/CURRENT.md. Båda sprintplanerna är klara. Gör ingen ny funktionalitet utan att jag ber om det. Om du ska fortsätta: kör npm run check först och läs avsnittet om avvikelser och kvarvarande roadmap.
+Läs CLAUDE.md och docs/handoff/CURRENT.md. Tidigare sprintar och den lokala hårdsäkringen är implementerade. Kör npm run check först och fortsätt enligt den aktuella planen från 2026-10-05: native målplattforms-QA och faktiska publiceringsuppgifter återstår. Bevara AppState v1 och den godkända UI-strukturen.
 ```
 
 ## Handoff back to Codex
