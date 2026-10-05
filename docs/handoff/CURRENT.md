@@ -1,6 +1,6 @@
 # Current handoff
 
-Updated: 2026-09-07
+Updated: 2026-10-05
 
 ## Current state
 
@@ -10,7 +10,11 @@ The follow-up UI polish gives remaining/over-budget days visual priority, keeps 
 
 The final interaction pass fixes native date segment focus: changing a month no longer replaces the input and moves editing to its year segment. Only the preview updates, preserving expanded calculation details. Validation focuses the first invalid input. Local-storage onboarding guidance is available to assistive technology and remains visible on mobile; validation text has higher contrast.
 
-Current checks: `npm run check` passes lint, 358 tests and build. Chrome localhost checks cover onboarding, demo, overlap editing, confirmation cancellation, persistence, calendar navigation and responsive layout. The polished overview has no horizontal overflow at 320–1600 px; the save footer remains visible at 667×375 with expanded calculation details. The built copy on port 4174 has also passed onboarding, budget validation, empty state and actual/planned overlap registration. See `docs/qa/localhost.md` for precise results, the five-task usability script and remaining manual checks. No real participant usability test has been performed. Safari WebDriver rejects session creation until Safari Settings → Developer → Allow remote automation is enabled; the user has been asked to enable it. Safari/Firefox, real iPhone, automated file selection and two official legal sources remain unverified.
+Current checks: `npm run check` passes lint, 358 tests and build. Chrome localhost checks cover onboarding, demo, overlap editing, confirmation cancellation, persistence, calendar navigation and responsive layout. The polished overview has no horizontal overflow at 320–1600 px; the save footer remains visible at 667×375 with expanded calculation details. The built copy on port 4174 has also passed onboarding, budget validation, empty state and actual/planned overlap registration.
+
+On 2026-10-05, the built copy on port 4175 passed real JSON/CSV downloads and file-chooser restore in Chrome with synthetic data. Downloaded bytes match canonical AppState v1 and the expected CSV. Pending restore blocks adding stays, settings and calendar editing with Enter. Cancel preserves data and returns focus; selecting the same file again works. Reload before confirmation preserves the edited plan, confirmation restores the backup, and reload after confirmation preserves the restored plan. Invalid JSON shows a clear error and leaves data unchanged through reload. No runtime changes were needed; the tested product commit is `30d7cd3`.
+
+The user selected Chrome for this local work; Safari automation is not a prerequisite. See `docs/qa/localhost.md` for precise results, the five-task usability script and remaining manual checks. No real participant usability test has been performed. Actual 200-percent zoom, Safari/Firefox, real iPhone and two official legal sources remain unverified.
 
 ## Historical sprint state (2026-08-17)
 
@@ -96,7 +100,7 @@ Two smaller judgement calls: the disclosure uses `min-height: 2.75rem` instead o
 
 Remaining, in this order:
 
-1. Complete the browser/file QA and source verification documented in `docs/qa/localhost.md`, then try the local beta with users.
+1. Try the local beta with users using the five-task script in `docs/qa/localhost.md`, and complete the remaining zoom and source checks. Chrome file QA is complete; the Safari/Firefox matrix is for future compatibility testing.
 2. Account and cloud sync only after a separate product decision. Web Storage limits documented below are the reason multi-device synchronization cannot be faked locally.
 
 Nothing here is deployed and no external legal review has been performed. The local UI work does not authorize new backend infrastructure.
