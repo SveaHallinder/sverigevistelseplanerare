@@ -1284,6 +1284,53 @@ test("main keeps the same stay or calendar day focused when the date refreshes",
   }
 });
 
+test("main preserves the first-plan draft through demo including an empty budget", async (context) => {
+  for (const budgetDays of ["17", ""]) {
+    await context.test(budgetDays ? "entered budget" : "empty budget", () => {
+      const { app, api, repository } = createTestBrowserApp(null);
+      const originalQuery = app.querySelector;
+      const form = profileForm({
+        departureDate: "2025-01-01",
+        budgetDays,
+        periodStart: "2026-10-01",
+        periodEnd: "2026-10-31",
+        swedishCitizen: "yes",
+        "connectionChecklist.spouseOrMinorChildren": "no"
+      });
+      const questions = { open: true };
+      let html = app.innerHTML;
+      Object.defineProperty(app, "innerHTML", {
+        get: () => html,
+        set: (value) => { html = value; questions.open = false; }
+      });
+      app.querySelector = (selector) => selector === '[data-form="profile"]'
+        ? form : selector === ".legal-questions" ? questions : originalQuery(selector);
+
+      withFormData(() => app.dispatch("click", { target: actionTarget("show-demo") }));
+      assert.equal(api.controller.getSnapshot().demo, true);
+      app.dispatch("click", { target: actionTarget("exit-demo") });
+
+      assert.match(app.innerHTML, /name="departureDate"[^>]*value="2025-01-01"/);
+      assert.match(app.innerHTML, new RegExp('name="budgetDays"[^>]*value="' + budgetDays + '"'));
+      assert.match(app.innerHTML, /name="periodStart"[^>]*value="2026-10-01"/);
+      assert.match(app.innerHTML, /name="periodEnd"[^>]*value="2026-10-31"/);
+      assert.match(app.innerHTML, /name="swedishCitizen" value="yes" checked/);
+      assert.match(app.innerHTML, /name="connectionChecklist\.spouseOrMinorChildren" value="no" checked/);
+      assert.equal(questions.open, true);
+      assert.equal(api.controller.getSnapshot().state, null);
+      assert.equal(repository.calls.save.length, 0);
+    });
+  }
+});
+
+test("main moves focus into demo and back to its trigger", () => {
+  const { app } = createTestBrowserApp(null);
+  app.dispatch("click", { target: actionTarget("show-demo") });
+  assert.ok(app.actualFocusSelectors.includes('[data-action="exit-demo"]'));
+  app.dispatch("click", { target: actionTarget("exit-demo") });
+  assert.ok(app.actualFocusSelectors.includes('[data-action="show-demo"]'));
+});
+
 test("main preserves an unsaved profile form through failed and cancelled imports", async (context) => {
   for (const state of [cockpitState(), null]) {
     await context.test(state ? "profile settings" : "first plan", async () => {

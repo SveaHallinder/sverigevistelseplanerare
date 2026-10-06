@@ -98,6 +98,7 @@ export function createBrowserApp(options = {}) {
   let clearRequested = false;
   let restoreRequest = 0;
   let pendingDateRender = false;
+  let demoDraft = null;
 
   function announce(message) {
     if (message) {
@@ -141,7 +142,7 @@ export function createBrowserApp(options = {}) {
     }
 
     app.innerHTML = renderOnboarding({
-      profile: profile ?? (published.editingProfile ? published.state?.profile : null),
+      profile: profile ?? (published.editingProfile ? published.state?.profile : demoDraft?.profile),
       fieldErrors,
       storageIssue: published.storageIssue,
       editing: published.editingProfile,
@@ -151,6 +152,10 @@ export function createBrowserApp(options = {}) {
       canExport: Boolean(published.state?.profile),
       native: Boolean(nativeFiles)
     });
+    if (demoDraft?.questionsOpen) {
+      const questions = app.querySelector?.(".legal-questions");
+      if (questions) questions.open = true;
+    }
   }
 
   function receivePublished(nextPublished) {
@@ -443,9 +448,25 @@ export function createBrowserApp(options = {}) {
         (stayButton ?? app.querySelector?.('[data-action="add-stay"]') ?? app)?.focus?.();
       }
     } else if (action === "show-demo") {
-      announce(controller.showDemo().message);
+      const form = app.querySelector?.('[data-form="profile"]');
+      if (form?.matches?.('[data-form="profile"]')) {
+        demoDraft = {
+          profile: {
+            ...readProfileForm(form),
+            budgetDays: new FormData(form).get("budgetDays") ?? ""
+          },
+          questionsOpen: Boolean(app.querySelector?.(".legal-questions")?.open)
+        };
+      }
+      const shown = controller.showDemo();
+      if (shown.ok) app.querySelector?.('[data-action="exit-demo"]')?.focus?.();
+      else demoDraft = null;
+      announce(shown.message);
     } else if (action === "exit-demo") {
-      announce(controller.exitDemo().message);
+      const exited = controller.exitDemo();
+      demoDraft = null;
+      if (exited.ok) app.querySelector?.('[data-action="show-demo"]')?.focus?.();
+      announce(exited.message);
     } else if (action === "edit-profile") {
       const edited = controller.beginEditProfile();
       announce(edited.message);
