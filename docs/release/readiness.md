@@ -1,6 +1,6 @@
 # Produktdemo och lanseringsunderlag
 
-Uppdaterat 2026-10-05. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution.
+Uppdaterat 2026-10-06 med lokal QA. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
 
 ## Vad produkten gör
 
@@ -39,8 +39,8 @@ Det detaljerade protokollet finns i [localhost-QA](../qa/localhost.md). Kör all
 
 | Yta | Verifierat | Kvar |
 | --- | --- | --- |
-| Webb i Chrome | Inmatning, överlapp, datumfel, backupförhandsvisning, sparande och omladdning; 320/390/768/1440 px utan sidöverflow | Verkliga användartester, slutlig kompatibilitetsmatris |
-| Native Mac Catalyst | Kör appens lokala origin; verklig JSON-import/bekräftelse, storleksavvisning, JSON/CSV-export med exakt filinnehåll, exportavbrott och plan efter avslut/omstart | Signerad sandbox/provider; tidigare vit skärmbild med okänd orsak enligt QA-protokollet |
+| Webb i Chrome | Inmatning, överlapp, datumfel, backupförhandsvisning, sparande och omladdning; slutlig datum-CSS vid 320/390/667/768/1440 px samt riktig 200 % zoom utan sidöverflow, med synlig sparrad och fungerande redigering/filåterställning | Verkliga användartester, slutlig kompatibilitetsmatris; senaste exportfilerna är inte byteverifierade enligt det daterade QA-protokollet |
+| Native Mac Catalyst | Kör appens lokala origin; verklig JSON-import/bekräftelse, storleksavvisning, JSON/CSV-export med exakt filinnehåll, exportavbrott och plan efter avslut/omstart; slutlig datumfelvy visuellt verifierad efter native-datumval | Signerad sandbox/provider; återkommande vit fångst med okänd orsak enligt QA-protokollet |
 | Native iPhone/iPad | Generiskt osignerat iOS Simulator-bygge kompilerar med Xcode 27 | Simulatorruntime/fysisk enhet, datumkontroller, VoiceOver, Dynamic Type, filproviders, omstart och uppdatering |
 | App Store | Xcode-projekt, delad scheme och appikon finns | Utgivare, signering, metadata, support/policy-URL, screenshots, avtal och Apple-granskning |
 
