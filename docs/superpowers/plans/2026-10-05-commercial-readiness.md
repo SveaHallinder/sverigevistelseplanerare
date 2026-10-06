@@ -8,6 +8,8 @@
 
 **Tech stack:** Node 20 built-ins, vanilla ES modules, HTML/CSS, SwiftUI, WebKit and UIKit; no third-party dependency.
 
+**Scope update 2026-10-06:** The user handles App Store publishing and requested completion of the local app. Publisher inputs, signing and store review are outside the current local implementation. Continue concrete local UX and correctness work without waiting for those inputs. Calculation remains Sweden calendar days, independent of Swedish city; no foreign-law or location schema is introduced.
+
 ## Phase 0 — facts and scope
 
 - [x] Read the current handoff, approved calculation/portability specifications and source/test contracts; record a clean `76039a4` baseline and passing `npm run check` (358 tests).
@@ -61,6 +63,20 @@ Files: `docs/qa/localhost.md`, `docs/handoff/CURRENT.md`, `docs/release/readines
 - [ ] Record the user's country/city decision and required publisher/business inputs. Broad correctness and App Store acceptance cannot be inferred from green automated tests.
 
 Product commit: `2c0a8a836646e7a61a4da1bdd7b0e69fb5e88957`; fresh lint/build/417 tests passed. Store/device acceptance and publisher decisions remain unchecked. Sweden-only city-independent calculation is the working assumption while scope clarification is pending; no foreign rules or city schema were added.
+
+## Phase 5 — local polish after publication scope clarification
+
+Files: `src/main.js`, `styles.css`, `test/ui.test.js`, `docs/qa/localhost.md`, `docs/handoff/CURRENT.md`, this plan.
+
+- [x] Reproduce demo discarding a first-plan draft; write RED regression tests for a populated and blank budget, then preserve raw draft values, disclosure and entry/exit focus without persistence changes.
+- [x] Verify draft/demo, empty-budget validation, empty state and actual/planned registration in Chrome on source and fresh built origins; measure the expanded dialog at 320×667, 390×844, 667×375 and 768×1024.
+- [x] Increase the close target to 44×44 px and primary hover contrast to 5.57:1. Reproduce native date-field clipping; contain controls with local CSS and confirm the normal dialog layout, actual picker opening/changed value and validation through native UI/AX.
+- [x] Verify native file export bytes and, on the final Mac build, status editing to 6/0/6 plus real backup selection/blocking/cancel/reselect/confirmation back to 2/5/6.
+- [x] Independently review the minimal JS/test/CSS diff; run fresh lint/build/421 tests and both unsigned native builds; compare all 23 bundled public files with source bytes.
+- [x] Update the six-step local QA and handoff so publication inputs are not local work gates. Preserve exact evidence and tool failures instead of inferring a perfect rating.
+- [ ] Repeat the final date CSS at narrow Chrome widths and actual 200-percent zoom, plus a visual native error-state check when capture is available. Chrome automation failed with a request-header-policy loading error; some Mac captures were white with live AX and capture/window errors. No workaround or full visual acceptance is claimed.
+
+Product commit: `235d2e10fc6b7d088b21077b16be798025c58122`. This pass changes three product/test files and no dependencies, schema or legal rules. Store/device checklist items above remain separate historical handoff items; they do not block the user's local-app scope.
 
 ## Acceptance boundary
 

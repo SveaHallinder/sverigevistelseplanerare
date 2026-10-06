@@ -1,8 +1,22 @@
 # Current handoff
 
-Updated: 2026-10-05
+Updated: 2026-10-06
 
 ## Current state
+
+The user will handle App Store publication. The current task is local functionality and UX in Chrome; publisher identity, signing, policy URLs and Apple review are not prerequisites for local work. Sweden calendar-day calculation applies independently of Swedish city. No foreign-country rules or city/GPS schema are part of the current app.
+
+Product commit: `235d2e10fc6b7d088b21077b16be798025c58122` (`235d2e1`) on `design/apple-esque-makeover`; this pass started at `2c13680`. Demo now preserves an unsaved first-plan draft, including blank budget text, voluntary answers and expanded questions. Entry/exit focus is explicit. The close target is 44×44 px, primary hover contrast is 5.57:1, and native date controls fit their fields without stretching the other field when an error is present. No dependency, storage schema or calculation/legal rule changed.
+
+Fresh final `npm run check`: lint, **421 tests** and build pass. Independent read-only review found no actionable issues and passed 147 UI/controller tests; the demo regression was observed RED before the fix. Both unsigned native builds pass; all 23 public files match source in `dist/` and both bundles.
+
+Chrome source and fresh `dist/` origins proved draft/demo preservation, validation/focus, empty state and 2/5/6 actual/planned/unique days. The expanded stay dialog had no clipped controls in 320×667, 390×844, 667×375 and 768×1024 before the final date-field CSS adjustment. Mac proved the final date dialog's normal layout and picker value changes, saved status editing to 6/0/6, then restored the exported backup to 2/5/6 through real file selection, blocking/cancel/reselect/confirmation. Native JSON/CSV bytes are canonical and exact, respectively. Read the dated QA for each verification boundary.
+
+Browser automation lost its request-header policy connection before repeating Chrome file QA; it could not be recovered in bounded retries. Mac snapshots sometimes showed a white web body with live AX, alongside ScreenCaptureKit and no-window errors; ordinary scroll produced a full view in one retest, but the cause remains unknown. Do not claim that observation is fixed. The remaining local checks are final date CSS at narrow Chrome widths, actual 200-percent zoom, and a visual native error-state check when capture works. Real usability testing remains unperformed. The app is locally buildable and demoable; a perfect UX rating is not an observed fact.
+
+Use `npm run dev` or build plus `npm run preview`; the current built QA server is `http://127.0.0.1:56155/` while its process is running. Follow the six-step script in `docs/qa/localhost.md`. Preserve AppState v1, the existing UI structure and the previously verified interval math. Store/device notes below are historical evidence and the user's publishing handoff, not permission questions for continued local development.
+
+## Previous hardening state (2026-10-05)
 
 Product commit: `2c0a8a836646e7a61a4da1bdd7b0e69fb5e88957` (`2c0a8a8`) on `design/apple-esque-makeover`. Baseline was `76039a4`. Fresh `npm run check` passes lint, 417 tests and build; the staged product diff passed `git diff --check`. No third-party dependency, persisted schema, cloud service, payment flow or legal rule was added.
 
@@ -119,9 +133,9 @@ Two smaller judgement calls: the disclosure uses `min-height: 2.75rem` instead o
 
 Remaining, in this order:
 
-1. Resolve the pending iOS runtime/install and publisher inputs, then test the exact build on iPhone/iPad, including dates, restart/update, VoiceOver, Dynamic Type and file providers. Keep signed sandbox and the documented white-capture observation in that acceptance pass.
-2. Try the local beta with users using the six-step script in `docs/qa/localhost.md`, and complete the remaining zoom and source/legal review. Chrome file QA is complete; Safari/Firefox is a separate future compatibility matrix.
-3. Complete real support/privacy pages, metadata/screenshots, rights/license and commercial decisions with the actual owner before a binding sale or store submission. The buyer demo and draft requirements are in `docs/release/readiness.md`.
+1. Finish the remaining local viewport/zoom and native error-state visual checks identified in the 2026-10-06 QA; try the six-step flow with real users. Do not expand dependencies or schema to polish the current UI.
+2. For the native target, verify the exact build on iPhone/iPad, including dates, restart/update, VoiceOver, Dynamic Type and file providers. Keep signed sandbox and the white-capture observation explicit. Safari/Firefox remain a separate future web compatibility matrix.
+3. The user owns store publication and business inputs. Support/privacy pages, metadata/screenshots, rights/license and commercial decisions belong to that handoff before a binding sale or submission; do not block local improvements on them. The buyer demo and draft requirements are in `docs/release/readiness.md`. Remaining source/legal review must not be presented as completed.
 4. Account and cloud sync only after a separate product decision. Web Storage limits documented below are the reason multi-device synchronization cannot be faked locally.
 
 Nothing here is deployed and no external legal review has been performed. The local UI work does not authorize new backend infrastructure.
@@ -163,7 +177,7 @@ claude
 Paste:
 
 ```text
-Läs CLAUDE.md och docs/handoff/CURRENT.md. Tidigare sprintar och den lokala hårdsäkringen är implementerade. Kör npm run check först och fortsätt enligt den aktuella planen från 2026-10-05: native målplattforms-QA och faktiska publiceringsuppgifter återstår. Bevara AppState v1 och den godkända UI-strukturen.
+Läs CLAUDE.md och docs/handoff/CURRENT.md. Användaren hanterar App Store-publiceringen; fortsätt med den lokala appens konkreta UX- och funktionskontroller enligt QA från 2026-10-06. Kör npm run check först. Bevara AppState v1 och den godkända UI-strukturen, och inför inte nya beroenden eller schemaändringar utan beslut.
 ```
 
 ## Handoff back to Codex
