@@ -2,7 +2,19 @@
 
 Updated: 2026-10-07
 
-## Latest local change: large-text calendar
+## Latest acceptance: current native Release
+
+This pass started at `ef7dff45c94398beb9e102fe858c0142676e8e74`. No product code changed. Fresh lint, 421/421 tests and web build pass. A new unsigned generic iPhone device Release build passes; its 23 public files match source. The generated device build directory is now ignored alongside the existing simulator/Catalyst directories.
+
+iPhone maximum-text landscape now shows the complete invalid-departure error. VoiceOver touch navigation focuses the full error and auto-scrolls it into view; speech and activation are not confirmed in this pass. Cancel at normal text preserves budget 5, October 2026 and 2 actual / 5 planned / 6 unique days. The phone is back in portrait, Text Size 3, VoiceOver and Capture Keyboard off.
+
+The latest simulator Release was installed over the QA iPad without uninstalling. Its executable and 23 web files match the artifact; budget, period and 2/5/6 survive. Maximum-text landscape reaches status/save/cancel and rejects invalid dates. Normal-text error/cancel pass. Maximum-text year view shows seven weekday columns, October registrations, December, year controls and switching 2026 → 2027 → 2026. Page Up with Capture Keyboard enabled provides controlled scrolling when wheel input/fast drags do not. Subsequent external UI input opened a January date draft; it was left untouched. iPad Text Size remains 11 and Capture Keyboard on, VoiceOver off; no final normal-text or saved-plan acceptance is claimed after that interruption.
+
+The actual current Mac Catalyst Release process passes invalid native date selection, complete error display, cancel, cold process restart and year switching with budget/period/2/5/6 preserved. Final Mac calendar is October 2026. Exports were not repeated in this pass; earlier dated file evidence remains separate.
+
+Remaining: full maximum-text portrait/landscape form and calendar matrix, iPad maximum-text full error/correction and settings draft through rejected import, complete VoiceOver speech/order/activation, physical devices/older supported OS and real participant usability. A manual VoiceOver listening result is requested and pending. These open checks prevent a 100-percent local acceptance claim. Continue the five-step script at the top of `docs/qa/localhost.md`; evidence is in `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`.
+
+## Previous local change: large-text calendar
 
 This pass started at `7d365cb`. At maximum native text size, November split across letters because the calendar title shared a narrow row with both arrows. The CSS now places the full-width title above the arrows and stacks the toolbar only for large native text. Normal Chrome layout is unchanged. Fresh lint, 421/421 tests and web build pass. Unsigned iOS Simulator and Mac Catalyst Release builds pass; all 23 public files match source in both bundles. The installed iPhone executable and 23 public files match the new simulator Release artifact.
 

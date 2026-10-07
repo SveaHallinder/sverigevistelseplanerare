@@ -2,6 +2,27 @@
 
 Kör `npm run dev` och öppna URL:en som servern skriver ut.
 
+## Senaste native Release, fortsatt acceptans 2026-10-07
+
+Passet började på `ef7dff45c94398beb9e102fe858c0142676e8e74`. Ingen produktkod ändrades. Färsk `npm run check` passerar lint, **421/421 tester utan skips** och webbbuild. Nytt osignerat generiskt iPhone-enhetsbygge i Release passerar; dess 23 publika filer matchar källan. Det bevisar kompilering, inte körning på fysisk telefon. `.gitignore` utesluter nu även den genererade `native/ios/build-device/`.
+
+- iPhone landskap, Text Size 11: hela ”Avresedatum måste vara samma dag eller senare än ankomstdatum.” syns. VoiceOver peknavigation fokuserar felet och rullar det till synlig position. Uppläsning och dubbeltrycksaktivering är inte verifierade i detta pass. Avbryt vid normal text bevarar budget 5, perioden 1–31 oktober 2026 och 2/5/6. Telefonen återställdes till porträtt, Text Size 3, VoiceOver/Capture Keyboard av.
+- iPad: senaste simulator-Release installerades över befintlig app utan avinstallation; exekverbar och 23 webbfiler matchar paketet exakt. Budget/period/2/5/6 bevaras. Maximal landskapstext visar nåbara status-/spar-/avbrytkontroller och ogiltigt datum avvisas. Hela felet och Avbryt är verifierade vid normal text. Maximal årsöversikt visar sju veckokolumner, oktobers registreringar, december och årspilar; 2026 → 2027 → 2026 fungerar. Det är ett avgränsat kalenderpass, inte hela porträtt-/landskapsmatrisen.
+- Rullning med hjul gav ingen synlig effekt och snabba simulatorgester hoppade långt. Capture Keyboard och Page Up gav kontrollerad rullning. En separat stor simulatorfångst klippte även enhetens högra ram; full Device Hub-fångst visar alla sju kolumner. Därefter ändrades simulatorvyn utifrån till ett öppet januariutkast/datumväljare; det lämnades orört. iPad är fortfarande Text Size 11, Capture Keyboard på och VoiceOver av. Ingen återställd normalvy eller slutlig planverifiering efter avbrottet hävdas.
+- Mac: faktisk senaste Catalyst Release-process verifierad genom körsökväg. Native ankomst 7/avresa 6 oktober avvisas, hela felet och åtgärder syns, Avbryt bevarar planen. Avslut och kall processstart bevarar budget/period/2/5/6. Årsbyte ändrar inte budget eller dagantal; kalendern återfördes till oktober 2026. Import/export kördes inte om i detta pass.
+
+Evidens i `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`: `check-latest-native-acceptance.log`, `build-device-release-latest.log`, `current-device-mac-release-check.txt`, `ipad-latest-release-byte-check.txt`, `iphone-landscape-max-full-error.jpg`, `iphone-after-max-error-cancel-preserved.jpg`, `ipad-{latest-release-preserved,max-form-actions,latest-date-error,latest-cancel-preserved}.jpg`, `ipad-max-year-{december,october,toolbar-2026,2027}.jpg` och `mac-latest-{release-plan,release-date-error,release-cold-start,calendar-restored}.jpg`.
+
+Kvar före full lokal acceptans: komplett stor-text-formulär/kalender i porträtt och landskap, iPads fulla fel/rättning vid maximal text och inställningsutkast genom avvisad import, VoiceOver-uppläsning/fokusordning/aktivering, fysiska enheter/äldre stödda OS samt deltagartest. Manuellt lyssningsresultat för separata datumetiketter och hela felet har efterfrågats men ännu inte inkommit. Appen är inte markerad som 100 procent sluttestad.
+
+### Fem steg för kvarvarande UI-acceptans
+
+1. Kör `npm run check` och `npm run dev`; öppna utskriven localhost-URL i Chrome. Skapa syntetisk oktoberplan: budget 5, faktisk 1–2 oktober, planerad 2–6 oktober. Kontrollera 2/5/6 och spara backup.
+2. På egna QA-iPhone/iPad, stäng eventuellt manuellt testutkast med Avbryt. Kontrollera planen före fortsättning. Vid Text Size 11, testa nytt utkast, omvända datum, hela felet, rättning/sparande och avbryt i porträtt och landskap. Återställ backupen efter ändringar.
+3. Kontrollera månad/år, årspilar och 2 oktobers överlappsval vid maximal text i båda orienteringarna. Budgetperiod och dagantal ska bevaras; alla kontroller ska vara nåbara. Capture Keyboard + Page Up/Page Down kan användas för kontrollerad simulatorrullning.
+4. Aktivera VoiceOver och lyssna på Ankomstdatum/Avresedatum var för sig, hela datumfelet och bekräftelser. Gå igenom fokusordningen, aktivera knappar och kontrollera fokusretur efter Avbryt. På iPad, prova även budgetutkast 13 genom ogiltig/stor import; utkastet ska bevaras och sparad budget förbli 5 efter Avbryt.
+5. Återställ Text Size 3, VoiceOver/Capture Keyboard av och normal orientering. Starta om: budget 5, oktoberperiod och 2/5/6 ska finnas kvar. Upprepa huvudflödet på fysisk målplattform/äldre stödda OS och låt en deltagare skapa, ändra och återställa sin syntetiska plan utan instruktioner.
+
 ## Kalender vid maximal text, 2026-10-07
 
 Passet började på `7d365cb`. I iPhone-appen vid Text Size 11 radbröts November mitt i ordet och kalenderetiketten klämdes. `styles.css` lägger nu hela månadsrubriken ovanför pilarna och staplar verktygsraden endast för stor native-text. Ingen dependency, lagringsmodell eller beräkning ändrades. Färsk `npm run check` passerar lint, 421/421 tester och webbbuild. Osignerade Release-byggen för iOS Simulator och Mac Catalyst passerar; båda paketens 23 publika filer matchar källan. Installerad iPhone-exekverbar och 23 webbfiler matchar det nya simulatorpaketet.

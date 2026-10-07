@@ -5,5 +5,6 @@ dist/
 native/ios/Web/
 native/ios/build/
 native/ios/build-catalyst/
+native/ios/build-device/
 native/ios/*.xcodeproj/xcuserdata/
 native/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
