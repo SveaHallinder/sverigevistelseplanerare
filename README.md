@@ -105,4 +105,4 @@ Starta `claude` i repots rot och skriv:
 Läs CLAUDE.md och docs/handoff/CURRENT.md. Den lokala användarupplevelsen är uppdaterad. Kör npm run check och följ kvarvarande QA; bygg inte om redan färdiga sprintar.
 ~~~
 
-Lokal QA och kvarvarande begränsningar finns i `docs/qa/localhost.md`. App Store-publicering kräver bland annat verifiering på iPhone/iPad, utgivarens signering, support och publicerad integritetspolicy. Full juridisk källverifiering och extern granskning återstår. Konto och molnsynk ligger efter den lokala betan.
+Lokal QA och kvarvarande begränsningar finns i `docs/qa/localhost.md`. App Store-publicering kräver bland annat verifiering på iPhone/iPad, utgivarens signering, support och publicerad integritetspolicy. Källornas relevanta avsnitt kontrollerades 2026-10-07; extern juridisk granskning återstår. Konto och molnsynk ligger efter den lokala betan.

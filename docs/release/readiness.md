@@ -1,12 +1,14 @@
 # Produktstatus och lanseringsunderlag
 
-Uppdaterat 2026-10-07 med Release-kontroller och pågående simulatorhämtning. Målet är en produktionsapp lokalt. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
+Uppdaterat 2026-10-07 med Release-kontroller, källuppdatering och installerad simulatorruntime. Målet är en produktionsapp lokalt. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
 
 ## Vad produkten gör
 
 Sverigevistelseplaneraren hjälper användaren att dokumentera faktiska och planerade vistelser i Sverige och jämföra registrerade kalenderdagar med en egen dagbudget. Ankomst- och avresedagar räknas inkluderande. Överlapp räknas en gång i totalen; faktiska och planerade dagar visas separat. Budgetperiod och kalendernavigation är separata.
 
 Beräkningen beror inte på vilken svensk stad vistelsen gäller. Stadsnamn, GPS och platsbehörighet ingår inte. Andra länders skatteregler eller tillåtna vistelsetider har inte implementerats. Juridiska observationer beskriver underlag med officiella källor; de avgör inte skattehemvist, skattskyldighet eller ett tillåtet antal Sverigedagar.
+
+Källornas relevanta avsnitt kontrollerades 2026-10-07. Vanlig Chrome-navigering öppnade båda sidorna i rättslig vägledning och deras senaste utgåva 2026.14; appens två äldre länkar och granskningsdatum uppdaterades i `1fd98a0`. Inga beräkningsregler ändrades. Protokoll och avgränsning finns i [localhost-QA](../qa/localhost.md); extern juridisk granskning har inte utförts.
 
 Webbversionen fungerar på en statisk server. Nativepaketet använder samma JavaScript och validering, bundlade resurser och Apples SwiftUI, WebKit och filväljare. Inga tredjepartsberoenden, konton, betalningar eller dold premiumspärr har lagts till.
 
@@ -41,10 +43,10 @@ Det detaljerade protokollet finns i [localhost-QA](../qa/localhost.md). Kör all
 | --- | --- | --- |
 | Webb i Chrome | Inmatning, överlapp, datumfel, backupförhandsvisning, sparande och omladdning; slutlig datum-CSS vid 320/390/667/768/1440 px samt riktig 200 % zoom utan sidöverflow, med synlig sparrad och fungerande redigering/filåterställning | Verkliga användartester, slutlig kompatibilitetsmatris; senaste exportfilerna är inte byteverifierade enligt det daterade QA-protokollet |
 | Native Mac Catalyst | Release kompilerar och kör appens lokala origin; datumfel, riktig JSON-import/bekräftelse, JSON/CSV-export med exakt filinnehåll och plan efter kall omstart verifierade i Release. Tidigare Debug-pass omfattar också storleksavvisning och exportavbrott | Signerad sandbox/provider; återkommande vit fångst med okänd orsak enligt QA-protokollet |
-| Native iPhone/iPad | Osignerade Release-byggen för iOS-enhet och iOS Simulator kompilerar med Xcode 27; alla 23 bundlade webbfiler matchar källan | Hämtningen av runtime är godkänd och påbörjad. Körning, datumkontroller, tangentbord, VoiceOver, Dynamic Type, filproviders, omstart och uppdatering kvarstår |
+| Native iPhone/iPad | Release-byggen för iOS-enhet och simulator på `1fd98a0` kompilerar; alla 23 webbfiler matchar källan. iOS 27 runtime är installerad med `Ready` / `Verified`; två separata QA-simulatorer är skapade | Manuell upplåsning av Macen behövs för fortsatt UI-test. Körning, datumkontroller, tangentbord, VoiceOver, Dynamic Type, filproviders, omstart och uppdatering kvarstår |
 | App Store | Xcode-projekt, delad scheme och appikon finns | Utgivare, signering, metadata, support/policy-URL, screenshots, avtal och Apple-granskning |
 
-En grön testsvit eller ett osignerat bygge bevisar inte App Store-acceptans. Vid den tidigare inventeringen saknades giltiga distributionssigneringsidentiteter enligt `security find-identity -v -p codesigning`. Simulatorhämtningen godkändes 2026-10-06; vid kontrollen 2026-10-07 är arkivet fortfarande ofullständigt och ingen körbar runtime installerad. iPhone/iPad är därför inte sluttestade.
+En grön testsvit eller ett osignerat bygge bevisar inte App Store-acceptans. Vid den tidigare inventeringen saknades giltiga distributionssigneringsidentiteter enligt `security find-identity -v -p codesigning`. Simulatorhämtningen godkändes 2026-10-06 och installation/signaturkontroll passerar 2026-10-07. UI-verktyget stoppades därefter av låst Mac och kunde inte låsa upp den. iPhone/iPad är därför fortfarande inte sluttestade; ett sexstegstest efter upplåsning finns i [localhost-QA](../qa/localhost.md).
 
 Matematiska regressioner, fem tidszoner och oberoende referensfall är godkända enligt QA-protokollet. En absolut garanti om alla situationer eller juridisk korrekthet kan inte ges från dessa tester. Verktyget kan demonstreras lokalt för en möjlig köpare; verifiering på målplattform och ett verkligt avtal behöver föregå en bindande leverans.
 
