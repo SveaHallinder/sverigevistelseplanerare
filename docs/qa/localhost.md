@@ -2,7 +2,25 @@
 
 Kör `npm run dev` och öppna URL:en som servern skriver ut.
 
-## Senaste native Release, fortsatt acceptans 2026-10-07
+## Aktuell Chrome, filinnehåll och ändringsflöde 2026-10-07
+
+Passet började på `f7a667ba90498833ba4bc384cb9bbb7850eb1469`; produktkällan är fortsatt `ef7dff45c94398beb9e102fe858c0142676e8e74`. Ingen produktkod ändrades. Färsk lint, **421/421 tester utan skips** och build passerar. QA använder en separat lokal origin; planen på port 4173 ändrades inte.
+
+Kalenderns Tab-ordning går från månad/år till föregående och nästa månad; Enter byter månad och behåller fokus på pilen. Tomläget, inkluderande dagar/överlapp 2/5/6, fältnära datumfel och rättad förhandsvisning verifieras. Vid 375×812 är hela felet läsbart; sparad rättning till 2/4/5 överlever omladdning. Vid 812×375 syns Spara/Avbryt och avbruten avreseändring behåller 2/4/5. Viewporten återställdes.
+
+Ogiltig JSON och 1 MiB+1 avvisas medan osparad budget 13 ligger kvar i inställningarna. Avbryt/omladdning ger sparad budget 5. Verkliga UI-nedladdningar ger 844-byte JSON med aktuell syntetisk profil/vistelser och exakt 114-byte CSV med CRLF, faktisk 1–2 oktober/2 dagar och planerad 2–6 oktober/5 dagar. Testverktygets nedladdningssignal uteblev, men filerna på disk verifierades med nya tidsstämplar och innehåll. Import av just den nya backupen: preview och Avbryt behåller 2/4/5, omval/bekräftelse/omladdning ger 2/5/6. Inga Chrome-konsolfel eller varningar.
+
+Evidens i `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`: `check-current-chrome-acceptance.log`, `chrome-current-backup.json`, `chrome-current-vistelser.csv`, `chrome-import-preserves-draft.png`, `chrome-mobile-date-error.png` och `chrome-current-restored-{plan,overview}.png`. Native iPads månads-/årsväxling fungerar med pekare/Return vid Text Size 11; januariutkastet är borta. Externa ändringsrapporter och avstängd Capture Keyboard förhindrar en kontrollerad fortsatt native-inmatning. Fråga om simulatoranvändning och manuellt VoiceOver-lyssningsresultat väntar på svar. Chrome-resultaten stänger inte de kvarvarande native-kontrollerna nedan.
+
+### Fem steg för reproducerbar Chrome-QA
+
+1. Kör `npm run check` och `npm run dev`. Använd en separat webbläsarprofil eller lokal origin för syntetisk QA. Skapa oktoberplan med budget 5; kontrollera tomläget.
+2. Lägg in faktisk 1–2 oktober och planerad 2–6 oktober: 2/5/6 och 1 över budget. Tabba mellan kalenderkontrollerna och byt månad med Enter; budgetperioden ska ligga kvar.
+3. Vid 375×812: redigera planerad avresa till 1 oktober, försök spara och läs hela felet. Rätta till 5 oktober, spara/ladda om: 2/4/5. Vid 812×375: ändra ett utkast och avbryt; planen ska vara kvar.
+4. I inställningar, ange budget 13 utan att spara. Välj trasig JSON och en fil större än 1 MiB: tydliga fel och utkast 13 kvar. Avbryt/ladda om: budget 5 kvar.
+5. Återför planerad avresa till 6 oktober och ladda ner JSON/CSV. Ändra till 5; välj den nya backupen och avbryt: 2/4/5 kvar. Välj samma fil igen och bekräfta/ladda om: 2/5/6. Återställ viewporten efter testet.
+
+## Tidigare native Release, fortsatt acceptans 2026-10-07
 
 Passet började på `ef7dff45c94398beb9e102fe858c0142676e8e74`. Ingen produktkod ändrades. Färsk `npm run check` passerar lint, **421/421 tester utan skips** och webbbuild. Nytt osignerat generiskt iPhone-enhetsbygge i Release passerar; dess 23 publika filer matchar källan. Det bevisar kompilering, inte körning på fysisk telefon. `.gitignore` utesluter nu även den genererade `native/ios/build-device/`.
 

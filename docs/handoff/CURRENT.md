@@ -2,7 +2,15 @@
 
 Updated: 2026-10-07
 
-## Latest acceptance: current native Release
+## Latest acceptance: current Chrome flow
+
+This pass started at `f7a667ba90498833ba4bc384cb9bbb7850eb1469`; product source remains `ef7dff45c94398beb9e102fe858c0142676e8e74`. No product code changed. Fresh `npm run check` passes lint, 421/421 tests without skips and web build.
+
+A separate Chrome origin preserves the existing 4173 plan. Empty state, calendar Tab order/Enter navigation, 2/5/6 overlap, invalid date rejection, correction/save/reload to 2/4/5, landscape cancellation and JSON restore preview/cancel/reselection/confirmation/reload pass. At 375×812 the full date error is readable; at 812×375 save/cancel remain visible. Viewport override is reset. Invalid JSON and 1 MiB+1 import preserve an unsaved budget draft of 13; cancelling settings and reloading preserves saved budget 5. Real UI downloads are recovered as 844-byte JSON and exact 114-byte CSV from this pass, copied to `chrome-current-{backup.json,vistelser.csv}` in the durable evidence directory. Chrome reports no console warnings/errors.
+
+The iPad January draft is no longer open in the current observation. Maximum-text month/year toggling works with pointer and Return. Capture Keyboard repeatedly turns off with external UI-change reports; the simulator ownership question is pending. Unexpected native Tab focus remains unexplained, while Chrome focuses previous/next month in order. This does not close native keyboard, maximum-text, VoiceOver speech or physical/older-OS acceptance. See the new five-step Chrome script and remaining native checks in `docs/qa/localhost.md`.
+
+## Previous acceptance: current native Release
 
 This pass started at `ef7dff45c94398beb9e102fe858c0142676e8e74`. No product code changed. Fresh lint, 421/421 tests and web build pass. A new unsigned generic iPhone device Release build passes; its 23 public files match source. The generated device build directory is now ignored alongside the existing simulator/Catalyst directories.
 
