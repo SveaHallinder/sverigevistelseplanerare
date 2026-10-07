@@ -36,27 +36,27 @@ test("legal content exposes the exact reviewed source configuration", () => {
     incomeTaxAct: {
       title: "Inkomstskattelagen, 3 kap. 3 och 7 §§",
       url: "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/inkomstskattelag-19991229_sfs-1999-1229/",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     },
     movedFromSweden: {
       title: "Skatteverket: Har du flyttat från Sverige?",
       url: "https://www.skatteverket.se/privat/internationellt/bosattutomlands/harduflyttatfransverige.4.7459477810df5bccdd4800030036.html",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     },
     permanentStay: {
       title: "Skatteverket: Stadigvarande vistelse i Sverige",
-      url: "https://www4.skatteverket.se/rattsligvagledning/edition/2026.7/2637.html",
-      reviewedAt: "2026-08-16"
+      url: "https://www4.skatteverket.se/rattsligvagledning/edition/2026.14/2637.html",
+      reviewedAt: "2026-10-07"
     },
     taxTreatyResidence: {
       title: "Skatteverket: Artikel 4 och skatteavtalshemvist",
-      url: "https://www4.skatteverket.se/rattsligvagledning/edition/2026.5/2970.html",
-      reviewedAt: "2026-08-16"
+      url: "https://www4.skatteverket.se/rattsligvagledning/edition/2026.14/2970.html",
+      reviewedAt: "2026-10-07"
     },
     sink183: {
       title: "Skatteverket: 183-dagarsregeln i SINK",
       url: "https://www.skatteverket.se/privat/etjansterochblanketter/svarpavanligafragor/sink/sink/vadar183dagarsregelnisinkochvadinnebarden.5.5b35a6251761e6914206793.html",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     }
   });
 });
@@ -110,7 +110,7 @@ test("tax treaty boundary is always informational and source-backed", () => {
     summary: "Appen räknar registrerade Sverigedagar men avgör inte hemvist enligt skatteavtal.",
     evidence: ["Endast registrerade datum och frivilliga profilsvar används."],
     sourceId: "taxTreatyResidence",
-    reviewedAt: "2026-08-16"
+    reviewedAt: "2026-10-07"
   }]);
 });
 
@@ -135,7 +135,7 @@ test("citizenship or ten years in Sweden adds the five-year evidence date", () =
         "Femårsdag 2030-05-10"
       ],
       sourceId: "incomeTaxAct",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     }]);
   }
 });
@@ -170,7 +170,7 @@ test("each affirmative connection answer creates its own keyed observation", () 
       summary: "Kräver individuell bedömning.",
       evidence: ['Du svarade "Ja" på frågan.'],
       sourceId: CHECKLIST_CONTENT[key].sourceId,
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     }]);
   }
 });
@@ -214,7 +214,7 @@ test("actual six-month facts remain actual and use exact neutral copy", () => {
         "Sexmånadersdag 2026-07-01"
       ],
       sourceId: "permanentStay",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     }
   );
 });
@@ -247,7 +247,7 @@ test("actual temporary-gap facts use exact evidence and copy", () => {
         "10 registrerade dagar efter"
       ],
       sourceId: "permanentStay",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     }
   );
 });
@@ -369,7 +369,7 @@ test("work observation becomes a scenario when planned stays are present", () =>
         "Faktisk plus planerad: högst 5 registrerade dagar i ett tolvmånadersfönster"
       ],
       sourceId: "sink183",
-      reviewedAt: "2026-08-16"
+      reviewedAt: "2026-10-07"
     }
   );
 });
