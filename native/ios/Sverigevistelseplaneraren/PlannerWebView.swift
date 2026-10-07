@@ -20,6 +20,7 @@ final class NativeWebState: ObservableObject {
 
 struct PlannerWebView: UIViewRepresentable {
     let state: NativeWebState
+    @ScaledMetric(relativeTo: .body) private var textSize: CGFloat = 16
 
     func makeCoordinator() -> NativeCoordinator { NativeCoordinator(state: state) }
 
@@ -36,12 +37,16 @@ struct PlannerWebView: UIViewRepresentable {
         view.isOpaque = false
         view.backgroundColor = .systemBackground
         context.coordinator.webView = view
+        context.coordinator.textSize = textSize
         state.webView = view
         view.load(URLRequest(url: URL(string: "sverigeapp://local/index.html")!))
         return view
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) { }
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        context.coordinator.textSize = textSize
+        context.coordinator.applyTextSize()
+    }
 
     static func dismantleUIView(_ uiView: WKWebView, coordinator: NativeCoordinator) {
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: "sverigeNative", contentWorld: .page)
@@ -77,6 +82,7 @@ private final class BundleSchemeHandler: NSObject, WKURLSchemeHandler {
 @MainActor
 final class NativeCoordinator: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDelegate, WKUIDelegate, UIDocumentPickerDelegate {
     weak var webView: WKWebView?
+    var textSize: CGFloat = 16
     private let state: NativeWebState
     private var pendingID: UUID?
     private var pendingAction: String?
@@ -212,7 +218,16 @@ final class NativeCoordinator: NSObject, WKScriptMessageHandlerWithReply, WKNavi
         return nil
     }
 
+    func applyTextSize() {
+        webView?.evaluateJavaScript(
+            "document.documentElement.style.setProperty('--native-text-scale', '\(textSize / 16)'); " +
+            "document.documentElement.toggleAttribute('data-large-text', \(textSize > 24))",
+            completionHandler: nil
+        )
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        applyTextSize()
         state.loadError = nil
         state.refreshDate()
     }

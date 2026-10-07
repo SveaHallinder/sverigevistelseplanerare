@@ -2,7 +2,11 @@
 
 Updated: 2026-10-07
 
-## Current state
+## Latest local change: Dynamic Type
+
+The planner previously ignored iOS text-size settings. `PlannerWebView.swift` now uses `@ScaledMetric` to pass a font-only scale to CSS, with single-column work areas and a fully scrollable dialog for large text. Default web layout, calculations, schema and dependencies are unchanged. Fresh lint, 421 tests, web build and unsigned iOS Simulator Debug build pass. Owned iPhone portrait and iPad landscape checks verify live enlargement/return to default; iPhone native dates and dialog action reachability were observed. Full large-text validation/calendar/landscape/VoiceOver coverage and rebuilt Release/Catalyst acceptance remain open. See the dated five-step regression and exact evidence/QA data caveat in `docs/qa/localhost.md`. Earlier Release evidence below does not validate this new product change.
+
+## Previous verified state
 
 The user will handle App Store publication. The current target is a production-quality local app, including native iPhone/iPad verification; publisher identity, signing, policy URLs and Apple review are not prerequisites for local implementation. Chrome remains the selected browser. Sweden calendar-day calculation applies independently of Swedish city. No foreign-country rules or city/GPS schema are part of the current app.
 
@@ -10,7 +14,7 @@ Release verification started on `634c390`: unsigned iOS device, iOS Simulator an
 
 Fresh `npm run check` on 2026-10-07 passes lint, 421/421 tests and build. The explicit Release command added to README also builds successfully; its 23 bundled public files match source. Logs: `/tmp/sverige-production-check-20261007.log` and `/tmp/sverige-readme-release-build-20261007.log`.
 
-Current product commit is `1fd98a0509b651817db8f1bf2b549d6cc7f2f5ae` (`1fd98a0`). The five cited official sources' relevant sections were read on 2026-10-07. Chrome opened both legal-guidance pages after direct reads were rejected; their visible latest-edition links led to 2026.14. Only the two source URLs and review dates changed, with corresponding existing observation-test expectations. No calculation, schema or dependency changed. Fresh lint, 421/421 tests and build pass (`/tmp/sverige-current-source-check-20261007.log`). This text check is not external legal review. Source evidence is in `/tmp/sverige-production-qa-20261007/`; the Release evidence above remains dated to the earlier product source.
+Previous product commit is `1fd98a0509b651817db8f1bf2b549d6cc7f2f5ae` (`1fd98a0`). The five cited official sources' relevant sections were read on 2026-10-07. Chrome opened both legal-guidance pages after direct reads were rejected; their visible latest-edition links led to 2026.14. Only the two source URLs and review dates changed, with corresponding existing observation-test expectations. No calculation, schema or dependency changed. Fresh lint, 421/421 tests and build pass (`/tmp/sverige-current-source-check-20261007.log`). This text check is not external legal review. Source evidence is in `/tmp/sverige-production-qa-20261007/`; the Release evidence above remains dated to the earlier product source.
 
 Release was rebuilt for all three platforms on `1fd98a0`. The surviving simulator Release artifact is `native/ios/build/Build/Products/Release-iphonesimulator/Sverigevistelseplaneraren.app`. The previous `/tmp/sverige-release-20261007/` and `/tmp/sverige-native-qa-20261007/` evidence directories are no longer available after restart; older temporary paths below are historical, not current evidence.
 

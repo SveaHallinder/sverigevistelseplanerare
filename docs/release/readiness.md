@@ -2,6 +2,8 @@
 
 Uppdaterat 2026-10-07 med Release-kontroller, källuppdatering och installerad simulatorruntime. Målet är en produktionsapp lokalt. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
 
+Senaste lokala ändringen kopplar planeraren till iOS Dynamic Type och låter stora texter flöda utan förstorade layoutmått. Lint, 421 tester, webbbuild och osignerat simulator-Debug-bygge passerar. Avgränsad iPhone-porträtt/iPad-landskapskontroll passerar; hela tillgänglighetsmatrisen och nya Release-/Catalyst-kontroller återstår. Äldre Release-bevis gäller sin angivna produktkod. Se det daterade femstegstestet i [localhost-QA](../qa/localhost.md).
+
 ## Vad produkten gör
 
 Sverigevistelseplaneraren hjälper användaren att dokumentera faktiska och planerade vistelser i Sverige och jämföra registrerade kalenderdagar med en egen dagbudget. Ankomst- och avresedagar räknas inkluderande. Överlapp räknas en gång i totalen; faktiska och planerade dagar visas separat. Budgetperiod och kalendernavigation är separata.

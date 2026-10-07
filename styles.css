@@ -57,7 +57,7 @@ body {
   background-attachment: fixed;
   font-family: var(--body-font);
   font-optical-sizing: auto;
-  font-size: 1rem;
+  font-size: calc(1rem * var(--native-text-scale, 1));
   font-weight: 400;
   letter-spacing: -0.014em;
   line-height: 1.47;
@@ -145,7 +145,7 @@ button {
 .eyebrow {
   margin: 0;
   color: rgba(255, 255, 255, 0.48);
-  font-size: 0.6875rem;
+  font-size: calc(0.6875rem * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -155,7 +155,7 @@ button {
   max-width: 13ch;
   margin: 0;
   font-family: var(--display-font);
-  font-size: clamp(2.1rem, 4.2vw, 2.85rem);
+  font-size: calc(clamp(2.1rem, 4.2vw, 2.85rem) * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.05;
@@ -165,7 +165,7 @@ button {
   max-width: 30ch;
   margin: 0;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 0.9375rem;
+  font-size: calc(0.9375rem * var(--native-text-scale, 1));
   font-weight: 400;
   line-height: 1.47;
   letter-spacing: -0.01em;
@@ -183,7 +183,7 @@ button {
   position: relative;
   padding-left: 1.35rem;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.9rem;
+  font-size: calc(0.9rem * var(--native-text-scale, 1));
   font-weight: 500;
 }
 
@@ -222,7 +222,7 @@ button {
 .field > label,
 .question-group legend {
   color: var(--ink-secondary);
-  font-size: 0.84rem;
+  font-size: calc(0.84rem * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -230,7 +230,7 @@ button {
 .field-hint,
 .details-intro {
   color: var(--ink-muted);
-  font-size: 0.84rem;
+  font-size: calc(0.84rem * var(--native-text-scale, 1));
   font-weight: 400;
 }
 
@@ -328,7 +328,7 @@ input[aria-invalid="true"] {
   background: var(--surface-muted);
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 0.9rem;
+  font-size: calc(0.9rem * var(--native-text-scale, 1));
   font-weight: 500;
   cursor: pointer;
 }
@@ -349,7 +349,7 @@ input[aria-invalid="true"] {
 .field-error {
   margin: 0;
   color: var(--validation-red);
-  font-size: 0.86rem;
+  font-size: calc(0.86rem * var(--native-text-scale, 1));
   font-weight: 600;
 }
 
@@ -368,7 +368,7 @@ input[aria-invalid="true"] {
 
 .error-summary h2 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * var(--native-text-scale, 1));
   letter-spacing: -0.02em;
 }
 
@@ -466,7 +466,7 @@ input[aria-invalid="true"] {
   background: rgba(255, 214, 10, 0.28);
   border: 1px solid rgba(201, 52, 0, 0.1);
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: calc(0.82rem * var(--native-text-scale, 1));
   font-weight: 600;
   text-align: center;
   letter-spacing: -0.01em;
@@ -503,7 +503,7 @@ input[aria-invalid="true"] {
 .app-header h1 {
   margin: 0.2rem 0 0;
   font-family: var(--display-font);
-  font-size: clamp(1.75rem, 3.5vw, 2.4rem);
+  font-size: calc(clamp(1.75rem, 3.5vw, 2.4rem) * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.08;
@@ -512,7 +512,7 @@ input[aria-invalid="true"] {
 .app-header__disclaimer {
   margin: 0.4rem 0 0;
   color: var(--ink-muted);
-  font-size: 0.875rem;
+  font-size: calc(0.875rem * var(--native-text-scale, 1));
   letter-spacing: -0.01em;
 }
 
@@ -564,7 +564,7 @@ input[aria-invalid="true"] {
 .summary-grid span {
   order: -1;
   color: var(--ink-muted);
-  font-size: 0.78rem;
+  font-size: calc(0.78rem * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -572,7 +572,7 @@ input[aria-invalid="true"] {
 .summary-grid strong {
   color: var(--ink);
   font-family: var(--display-font);
-  font-size: clamp(1.85rem, 3.6vw, 2.5rem);
+  font-size: calc(clamp(1.85rem, 3.6vw, 2.5rem) * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -594,7 +594,7 @@ input[aria-invalid="true"] {
 .section-kicker {
   margin: 0;
   color: var(--ink-muted);
-  font-size: 0.68rem;
+  font-size: calc(0.68rem * var(--native-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -607,14 +607,14 @@ input[aria-invalid="true"] {
   gap: 0.5rem;
   margin: 0.25rem 0 0;
   color: var(--ink);
-  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+  font-size: calc(clamp(1.4rem, 2.5vw, 1.9rem) * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.2;
 }
 
 .budget-status h2 strong {
-  font-size: clamp(3.5rem, 7vw, 5rem);
+  font-size: calc(clamp(3.5rem, 7vw, 5rem) * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.065em;
   line-height: 1.05;
@@ -622,7 +622,7 @@ input[aria-invalid="true"] {
 }
 
 .budget-status h2 span {
-  font-size: 1.1rem;
+  font-size: calc(1.1rem * var(--native-text-scale, 1));
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -649,11 +649,11 @@ input[aria-invalid="true"] {
 .budget-status p:not(.section-kicker) {
   margin: 0.4rem 0 0;
   color: var(--ink-muted);
-  font-size: 0.9rem;
+  font-size: calc(0.9rem * var(--native-text-scale, 1));
 }
 
 .budget-status__excluded {
-  font-size: 0.88rem;
+  font-size: calc(0.88rem * var(--native-text-scale, 1));
 }
 
 .edge-ranges {
@@ -705,7 +705,7 @@ input[aria-invalid="true"] {
 .calculation-details__body h3 {
   margin: 1rem 0 0.35rem;
   color: var(--ink);
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * var(--native-text-scale, 1));
   letter-spacing: -0.02em;
 }
 
@@ -727,7 +727,7 @@ input[aria-invalid="true"] {
 
 .calculation-details__body dt {
   color: var(--ink-muted);
-  font-size: 0.85rem;
+  font-size: calc(0.85rem * var(--native-text-scale, 1));
 }
 
 .calculation-details__body dd {
@@ -742,7 +742,7 @@ input[aria-invalid="true"] {
   margin-block: 0.15rem 0;
   padding: 0.15rem 0.35rem;
   color: var(--ink-muted);
-  font-size: 0.82rem;
+  font-size: calc(0.82rem * var(--native-text-scale, 1));
   font-weight: 550;
 }
 
@@ -814,7 +814,7 @@ input[aria-invalid="true"] {
 .calendar-hint {
   margin: 0;
   color: var(--ink-muted);
-  font-size: 0.875rem;
+  font-size: calc(0.875rem * var(--native-text-scale, 1));
   line-height: 1.5;
 }
 
@@ -834,7 +834,7 @@ input[aria-invalid="true"] {
   min-height: 2.75rem;
   cursor: pointer;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: calc(1rem * var(--native-text-scale, 1));
 }
 
 .stay-dialog .stay-choices {
@@ -863,7 +863,7 @@ input[aria-invalid="true"] {
   margin: 0;
   color: var(--ink);
   font-family: var(--display-font);
-  font-size: clamp(1.55rem, 2.8vw, 1.9rem);
+  font-size: calc(clamp(1.55rem, 2.8vw, 1.9rem) * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.045em;
   text-align: center;
@@ -891,7 +891,7 @@ input[aria-invalid="true"] {
 
 .year-calendar--month .calendar-day {
   min-height: 2.75rem;
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * var(--native-text-scale, 1));
 }
 
 .month-card {
@@ -909,7 +909,7 @@ input[aria-invalid="true"] {
   margin: 0 0 0.55rem;
   padding-inline: 0.3rem;
   color: var(--ink);
-  font-size: 0.88rem;
+  font-size: calc(0.88rem * var(--native-text-scale, 1));
   font-weight: 650;
   letter-spacing: -0.02em;
 }
@@ -924,7 +924,7 @@ input[aria-invalid="true"] {
 .month-card th {
   height: 1.5rem;
   color: var(--ink-muted);
-  font-size: 0.65rem;
+  font-size: calc(0.65rem * var(--native-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0.06em;
   text-align: center;
@@ -948,7 +948,7 @@ input[aria-invalid="true"] {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 50%;
-  font-size: 0.8rem;
+  font-size: calc(0.8rem * var(--native-text-scale, 1));
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   transition: background-color 140ms var(--ease), color 140ms var(--ease), transform 140ms var(--ease);
@@ -1025,7 +1025,7 @@ input[aria-invalid="true"] {
   margin: 0 0 0.95rem;
   color: var(--ink);
   font-family: var(--display-font);
-  font-size: 1.15rem;
+  font-size: calc(1.15rem * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.03em;
 }
@@ -1071,7 +1071,7 @@ button.stay-row:hover {
 
 .status-label {
   color: var(--ink-muted);
-  font-size: 0.7rem;
+  font-size: calc(0.7rem * var(--native-text-scale, 1));
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1095,7 +1095,7 @@ button.stay-row:hover {
 .stay-outcome p {
   margin: 0 0 0.55rem;
   color: var(--ink-muted);
-  font-size: 0.86rem;
+  font-size: calc(0.86rem * var(--native-text-scale, 1));
 }
 
 .empty-state {
@@ -1108,14 +1108,14 @@ button.stay-row:hover {
 .empty-state h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 1rem;
+  font-size: calc(1rem * var(--native-text-scale, 1));
   letter-spacing: -0.02em;
 }
 
 .empty-state p,
 .empty-observations {
   color: var(--ink-muted);
-  font-size: 0.88rem;
+  font-size: calc(0.88rem * var(--native-text-scale, 1));
 }
 
 .observation {
@@ -1133,7 +1133,7 @@ button.stay-row:hover {
 .observation__scope {
   margin: 0;
   color: var(--observation-amber);
-  font-size: 0.66rem;
+  font-size: calc(0.66rem * var(--native-text-scale, 1));
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1142,14 +1142,14 @@ button.stay-row:hover {
 .observation h3 {
   margin: 0.25rem 0 0;
   color: var(--ink);
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * var(--native-text-scale, 1));
   letter-spacing: -0.02em;
 }
 
 .observation h3 + p,
 .observation__evidence {
   margin: 0.4rem 0;
-  font-size: 0.86rem;
+  font-size: calc(0.86rem * var(--native-text-scale, 1));
 }
 
 .observation__evidence {
@@ -1162,7 +1162,7 @@ button.stay-row:hover {
   align-items: center;
   min-height: 2.75rem;
   color: var(--actual-blue);
-  font-size: 0.84rem;
+  font-size: calc(0.84rem * var(--native-text-scale, 1));
   font-weight: 650;
   overflow-wrap: anywhere;
 }
@@ -1170,7 +1170,7 @@ button.stay-row:hover {
 .source-date {
   margin: 0.25rem 0 0;
   color: var(--ink-muted);
-  font-size: 0.74rem;
+  font-size: calc(0.74rem * var(--native-text-scale, 1));
 }
 
 .app-footer {
@@ -1199,7 +1199,7 @@ button.stay-row:hover {
 .inline-confirm h2,
 .inline-confirm h3 {
   color: #b01d16;
-  font-size: 1.02rem;
+  font-size: calc(1.02rem * var(--native-text-scale, 1));
   letter-spacing: -0.02em;
 }
 
@@ -1217,7 +1217,7 @@ button.stay-row:hover {
 .data-tools > p {
   margin: 0 0 0.85rem;
   color: var(--ink-muted);
-  font-size: 0.88rem;
+  font-size: calc(0.88rem * var(--native-text-scale, 1));
 }
 
 .data-tools__actions {
@@ -1305,7 +1305,7 @@ button.stay-row:hover {
 .stay-dialog > header h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 1.3rem;
+  font-size: calc(1.3rem * var(--native-text-scale, 1));
   font-weight: 600;
   letter-spacing: -0.04em;
 }
@@ -1318,7 +1318,7 @@ button.stay-row:hover {
   background: var(--surface-muted);
   border: 0;
   border-radius: 50%;
-  font-size: 1.05rem;
+  font-size: calc(1.05rem * var(--native-text-scale, 1));
   line-height: 1;
 }
 
@@ -1368,19 +1368,19 @@ button.stay-row:hover {
 .stay-preview h3 {
   margin: 0 0 0.4rem;
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: calc(0.92rem * var(--native-text-scale, 1));
   letter-spacing: -0.02em;
 }
 
 .stay-preview p {
   margin: 0.28rem 0;
   color: var(--ink-muted);
-  font-size: 0.86rem;
+  font-size: calc(0.86rem * var(--native-text-scale, 1));
 }
 
 .stay-preview .stay-preview__balance {
   color: var(--ink);
-  font-size: 1.15rem;
+  font-size: calc(1.15rem * var(--native-text-scale, 1));
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.025em;
@@ -1392,7 +1392,7 @@ button.stay-row:hover {
   min-height: 2.75rem;
   padding-block: 0.75rem;
   color: var(--ink-secondary);
-  font-size: 0.8rem;
+  font-size: calc(0.8rem * var(--native-text-scale, 1));
   font-weight: 600;
   cursor: pointer;
 }
@@ -1409,7 +1409,7 @@ button.stay-row:hover {
 .delete-confirmation p {
   margin: 0;
   color: #b01d16;
-  font-size: 0.9rem;
+  font-size: calc(0.9rem * var(--native-text-scale, 1));
 }
 
 .sr-only {
@@ -1511,7 +1511,7 @@ button.stay-row:hover {
 
   .onboarding h1 {
     max-width: 16ch;
-    font-size: clamp(1.9rem, 7vw, 2.6rem);
+    font-size: calc(clamp(1.9rem, 7vw, 2.6rem) * var(--native-text-scale, 1));
   }
 
   .disclaimer {
@@ -1546,7 +1546,7 @@ button.stay-row:hover {
   }
 
   .app-header h1 {
-    font-size: clamp(1.65rem, 6vw, 2.2rem);
+    font-size: calc(clamp(1.65rem, 6vw, 2.2rem) * var(--native-text-scale, 1));
   }
 
   .header-actions {
@@ -1589,7 +1589,7 @@ button.stay-row:hover {
   }
 
   .summary-grid strong {
-    font-size: clamp(1.7rem, 9vw, 2.25rem);
+    font-size: calc(clamp(1.7rem, 9vw, 2.25rem) * var(--native-text-scale, 1));
   }
 
   .header-actions,
@@ -1606,7 +1606,7 @@ button.stay-row:hover {
 
   .header-actions button {
     padding-inline: 0.65rem;
-    font-size: 0.84rem;
+    font-size: calc(0.84rem * var(--native-text-scale, 1));
   }
 
   .budget-status {
@@ -1615,11 +1615,11 @@ button.stay-row:hover {
   }
 
   .budget-status p:not(.section-kicker) {
-    font-size: 0.82rem;
+    font-size: calc(0.82rem * var(--native-text-scale, 1));
   }
 
   .summary-grid span {
-    font-size: 0.72rem;
+    font-size: calc(0.72rem * var(--native-text-scale, 1));
   }
 
   .month-card {
@@ -1634,11 +1634,11 @@ button.stay-row:hover {
   .calendar-day {
     min-width: 0;
     min-height: 2.55rem;
-    font-size: 0.76rem;
+    font-size: calc(0.76rem * var(--native-text-scale, 1));
   }
 
   .year-nav h2 {
-    font-size: 1.45rem;
+    font-size: calc(1.45rem * var(--native-text-scale, 1));
   }
 
   #stay-dialog {
@@ -1671,7 +1671,7 @@ button.stay-row:hover {
 
   .demo-banner {
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-size: calc(0.78rem * var(--native-text-scale, 1));
     padding-inline: 0.85rem;
   }
 
@@ -1719,11 +1719,11 @@ button.stay-row:hover {
 @media (max-width: 22.5rem) {
   .calendar-day {
     min-height: 2.4rem;
-    font-size: 0.72rem;
+    font-size: calc(0.72rem * var(--native-text-scale, 1));
   }
 
   .app-header h1 {
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--native-text-scale, 1));
   }
 }
 
@@ -1751,4 +1751,45 @@ button.stay-row:hover {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Let enlarged native text reflow without trapping fields behind a fixed footer. */
+html[data-large-text] body {
+  overflow-wrap: anywhere;
+}
+
+html[data-large-text] .cockpit-shell,
+html[data-large-text] .cockpit-layout,
+html[data-large-text] .cockpit-aside,
+html[data-large-text] .onboarding-layout,
+html[data-large-text] .summary-grid,
+html[data-large-text] .year-calendar,
+html[data-large-text] .header-actions,
+html[data-large-text] .date-pair,
+html[data-large-text] .stay-dialog .radio-options,
+html[data-large-text] .stay-dialog__actions .form-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-large-text] .app-header {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+html[data-large-text] .stay-dialog,
+html[data-large-text] .stay-dialog form {
+  display: block;
+}
+
+html[data-large-text] .stay-dialog__body {
+  overflow: visible;
+}
+
+html[data-large-text] .stay-dialog > header {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+html[data-large-text] .cockpit-layout {
+  grid-template-areas: "stays" "calendar" "legend" "legal" "data";
 }

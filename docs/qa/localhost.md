@@ -2,6 +2,22 @@
 
 Kör `npm run dev` och öppna URL:en som servern skriver ut.
 
+## Dynamic Type-fix, 2026-10-07
+
+Planerarens textstorlek följde inte iOS-inställningen, medan native-informationen gjorde det. `PlannerWebView.swift` överför nu SwiftUI:s skalade textmått till CSS. Bara text förstoras; layoutmått behåller sin normala storlek. Över 150 % textskalning staplas arbetsytor och hela vistelsedialogen rullar, så att fälten inte fastnar bakom sparraden. Webbversionen använder skala 1. Ingen beräkning, lagringsmodell eller dependency ändrades.
+
+Färsk lint, 421/421 tester, webbbuild och osignerat iOS Simulator Debug-bygge passerar. Chrome på `http://127.0.0.1:4173/` visar normal vy med 16 px brödtext, 38,4 px huvudrubrik och ingen horisontell sidöverflow vid 1458 px; ingen native-skalning är aktiverad där. På de två egna iOS/iPadOS 27-simulatorerna verifierades förstoring och återgång till normal text medan appen körde. iPhone porträtt visar textomflöde, fungerande native datumväljare och nåbara Lägg till/Avbryt genom dialogrullning. iPad landskap återgår till normal layout och 2/5/6. Detta är ett avgränsat visuellt test; VoiceOver, hela formulär-/kalendermatrisen vid stor text, iPhone landskap, äldre OS och fysisk enhet är kvar. Release-/Catalyst-bevisen nedan gäller tidigare produktkod.
+
+Evidens: `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`, `check-dynamic-type.log`, `build-dynamic-type.log`, `iphone-dynamic-type-{max,actions}.jpg` och `ipad-dynamic-type-max.jpg`. Under koordinatbaserad iPhone-QA sparades en extra syntetisk 7-oktobervistelse; simulatorn visar därför 2/6/7. Räkna inte detta som bevis för att Avbryt bevarade 2/5/6. Simulatorernas textinställningar återställdes till ursprungsvärde 3.
+
+### Minimal regression via UI
+
+1. Kör `npm run check`, `node scripts/build-ios.mjs` och `npm run dev`; öppna serverns URL i Chrome. Kontrollera att normal textstorlek och demo fungerar som tidigare.
+2. Öppna samma syntetiska plan i egen iPhone/iPad-simulator. Höj Text Size medan appen kör; texten ska förstoras utan att marginalerna förstoras lika mycket.
+3. Vid maximal storlek: öppna Lägg till vistelse, stäng datumväljaren och rulla genom ankomst, avresa och status till spar-/avbrytknapparna.
+4. Prova omvända datum och kontrollera synligt fel, rättning och avbrott. Upprepa i porträtt och landskap; detta fullständiga moment återstår att verifiera efter fixen.
+5. Återställ normal textstorlek. Kontrollera normal layout, sparad plan och fokus; starta om appen och kontrollera igen.
+
 ## Snabb QA för lokal app
 
 Använd en separat webbläsarprofil med syntetiska testdata. `localhost` och `127.0.0.1` har separata lagringsutrymmen; behåll samma URL under testet.
