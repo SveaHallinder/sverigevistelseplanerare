@@ -1776,6 +1776,10 @@ html[data-large-text] .app-header {
   align-items: stretch;
 }
 
+html[data-large-text] .header-actions {
+  display: grid;
+}
+
 html[data-large-text] .stay-dialog,
 html[data-large-text] .stay-dialog form {
   display: block;

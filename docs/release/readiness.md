@@ -2,7 +2,7 @@
 
 Uppdaterat 2026-10-07 med Release-kontroller, källuppdatering och installerad simulatorruntime. Målet är en produktionsapp lokalt. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
 
-Senaste lokala ändringen kopplar planeraren till iOS Dynamic Type och låter stora texter flöda utan förstorade layoutmått. Lint, 421 tester, webbbuild och osignerat simulator-Debug-bygge passerar. Avgränsad iPhone-porträtt/iPad-landskapskontroll passerar; hela tillgänglighetsmatrisen och nya Release-/Catalyst-kontroller återstår. Äldre Release-bevis gäller sin angivna produktkod. Se det daterade femstegstestet i [localhost-QA](../qa/localhost.md).
+Senaste lokala ändringen kopplar planeraren till iOS Dynamic Type och rättar huvudknapparnas omflöde vid stor text i landskap. Ny lint, 421 tester, webbbuild och osignerade Release-byggen för simulator och Mac Catalyst passerar. Båda paketens 23 publika filer matchar källan; installerad iPhone-exekverbar matchar det nya Release-paketet. Begränsad visuell iPhone-landskapskontroll verifierar hela raden för Inställningar vid stor text och återgång till normal text. Fulla datum-/kalenderflöden och VoiceOver är fortfarande öppna: Device Hub avvisade koordinatinteraktioner, och VoiceOver-försöket gav ingen verifierad webbuppläsning. Catalyst är ombyggt men inte kört om. Detta är inte full produktionsacceptans. Se senaste daterade resultatet och femstegstestet i [localhost-QA](../qa/localhost.md).
 
 ## Vad produkten gör
 

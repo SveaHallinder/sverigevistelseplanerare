@@ -2,6 +2,16 @@
 
 Kör `npm run dev` och öppna URL:en som servern skriver ut.
 
+## Stor text i iPhone-landskap, fortsatt QA 2026-10-07
+
+Passet började på `e9b3c2c`. Huvudknapparnas behållare använde flex i landskap, så den tidigare regeln för en gridkolumn saknade effekt. En enda CSS-regel byter behållaren till grid endast vid stor native-text. Ingen beräkning, schema eller dependency ändrades. Ny lint, 421/421 tester och webbbuild passerar. Osignerade Release-byggen för iOS Simulator och Mac Catalyst passerar med den nya regeln; alla 23 publika filer matchar källan i båda paketen. Installerad iPhone-exekverbar matchar det nya simulator-Release-paketet byte för byte.
+
+iPhone-appen öppnades via Spotlight efter installation över befintlig app. Landskapsvyn visar fortsatt 7 av 5 dagar använda i den tidigare syntetiska planen. Text Size 9 visar Inställningar på hela raden efter rättningen; maximal storlek 11 förstorar och radbryter rubriken. Normal storlek 3 återställdes och visar normal layout. Detta verifierar omflödet vid huvudknapparna, inte det fullständiga datumflödet eller alla sparade fält. Mac Catalyst har byggts och bytekontrollerats men inte körts om.
+
+VoiceOver aktiverades på QA-iPad: systemets gestintroduktion och fokusmarkering på native-rubriken observerades. Fortsatt tangentbordsnavigation gav svart simulatorbild; orsaken är inte fastställd. Bilden återkom efter avstängning. VoiceOver och Capture Keyboard är åter avstängda. Webbkontrollernas uppläsning och ordning är inte godkända. Koordinattryck i Device Hub avvisades därefter med `noWindowsAvailable`, även efter återanslutning, Raise, Zoom to Fit och centrering. AX-åtgärder fungerade fortsatt. Fullt landskaps-/datum-/kalenderflöde kräver därför fortsatt UI-test; inget produktfel i dessa flöden påstås utifrån verktygsfelet.
+
+Evidens i `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`: `check-landscape-large-text.log`, `build-{release,catalyst-release}-landscape-large-text.log`, `release-landscape-byte-check.txt` och `iphone-landscape-large-text-{before,release}.jpg`. Kör femstegstestet nedan för kvarvarande interaktioner.
+
 ## Dynamic Type-fix, 2026-10-07
 
 Planerarens textstorlek följde inte iOS-inställningen, medan native-informationen gjorde det. `PlannerWebView.swift` överför nu SwiftUI:s skalade textmått till CSS. Bara text förstoras; layoutmått behåller sin normala storlek. Över 150 % textskalning staplas arbetsytor och hela vistelsedialogen rullar, så att fälten inte fastnar bakom sparraden. Webbversionen använder skala 1. Ingen beräkning, lagringsmodell eller dependency ändrades.
