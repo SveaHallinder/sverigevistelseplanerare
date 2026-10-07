@@ -2,6 +2,26 @@
 
 Kör `npm run dev` och öppna URL:en som servern skriver ut.
 
+## Kalender vid maximal text, 2026-10-07
+
+Passet började på `7d365cb`. I iPhone-appen vid Text Size 11 radbröts November mitt i ordet och kalenderetiketten klämdes. `styles.css` lägger nu hela månadsrubriken ovanför pilarna och staplar verktygsraden endast för stor native-text. Ingen dependency, lagringsmodell eller beräkning ändrades. Färsk `npm run check` passerar lint, 421/421 tester och webbbuild. Osignerade Release-byggen för iOS Simulator och Mac Catalyst passerar; båda paketens 23 publika filer matchar källan. Installerad iPhone-exekverbar och 23 webbfiler matchar det nya simulatorpaketet.
+
+Efter installation över befintlig app verifierades maximal text med hela ordet November, fungerande föregående/nästa månad, 2 oktober och valet av planerad vistelse i överlappningen. Native datumväljare visade ankomst 2 oktober; redigeringsdialogen visade avresa 6 oktober. Avbryt återförde VoiceOver-fokus till kalenderdagen. Återgång till Text Size 3 visar fortsatt budget 5, period 1–31 oktober 2026 och 2 faktiska / 5 planerade / 6 unika dagar. VoiceOver och Capture Keyboard är avstängda efter testet. Chrome på `http://127.0.0.1:4173/` behåller normal verktygsrad och saknar horisontell sidöverflow vid 1458 px; dess separata syntetiska augustiplan ändrades inte.
+
+Före kalenderändringen verifierades iPhone-landskap med ankomst 7 / avresa 6 oktober: spara avvisades, avreseväljaren öppnades och ett fältnära fel visades efter stängning. Vid maximal text gick hela dialogen att rulla till Lägg till/Avbryt. Rättning till 8 oktober och sparande fungerade; ett senare avbrutet utkast bevarade 2/7/8. Verkligt JSON-filval, förhandsgranskning och bekräftelse återställde därefter 2/5/6. Feltexten var delvis klippt i den maximala landskapsbilden; hela dess läsbarhet är inte godkänd.
+
+VoiceOver testades med verkligt pekfokus och dubbeltryck: Lägg till, native datumväljarens stängning och Avbryt återförde fokus till Lägg till. Högergester nådde kalendern och månad/år-växlingen fungerade. Efter kalenderfixen verifierades även överlappsval och fokusretur till dagen. Dessa visuella fokus-/aktiveringsbevis godkänner inte upplästa etiketter, komplett fokusordning eller feluppläsning. Hela stora-text-/års-/formulärmatrisen, iPad med senaste CSS, landskapskalender, ny Catalyst-körning, fysisk/äldre OS och verkliga användartester återstår.
+
+Evidens i `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`: `check-calendar-large-text.log`, `build-{release,catalyst-release}-calendar-large-text.log`, `release-calendar-byte-check.txt`, `iphone-calendar-max-{before,after,overlap-edit,return-focus}.jpg` och `iphone-calendar-plan-preserved.jpg`. Föregående UI-pass: `iphone-landscape-max-{actions,valid-saved}.jpg`, `iphone-landscape-cancel-preserved.jpg`, `iphone-restored-after-landscape.jpg` och `iphone-voiceover-{add-focus,cancel-return,calendar-focus}.jpg`.
+
+### Fem steg för lokal regression
+
+1. Kör `npm run dev` och öppna serverns URL i Chrome. Kontrollera normal kalenderlayout, månadspilar och oförändrad budgetperiod.
+2. Installera simulatorbygget på en egen QA-iPhone med syntetisk oktoberplan 2/5/6. Höj Text Size till 11; gå oktober → november → oktober. Hela månadsnamnet och båda pilarna ska rymmas.
+3. Aktivera VoiceOver, gå till 2 oktober och välj planerad vistelse. Kontrollera 2–6 oktober, avbryt och kontrollera att fokus återgår till kalenderdagen och totalen förblir 2/5/6.
+4. I landskap, öppna nytt utkast med avresa före ankomst. Kontrollera avvisning, hela feltextens läsbarhet och nåbara åtgärder; rätta och spara. Avbryt ett nytt utkast och återställ därefter den syntetiska backupen med förhandsgranskning/bekräftelse.
+5. Kontrollera VoiceOver-uppläsning av etiketter och fel på målplattformen. Stäng av VoiceOver, återställ Text Size 3 och kontrollera period, budget och 2/5/6 efter omstart. Upprepa stor-text-kontrollen på iPad; dessa fullständiga slutmoment återstår.
+
 ## Stor text i iPhone-landskap, fortsatt QA 2026-10-07
 
 Passet började på `e9b3c2c`. Huvudknapparnas behållare använde flex i landskap, så den tidigare regeln för en gridkolumn saknade effekt. En enda CSS-regel byter behållaren till grid endast vid stor native-text. Ingen beräkning, schema eller dependency ändrades. Ny lint, 421/421 tester och webbbuild passerar. Osignerade Release-byggen för iOS Simulator och Mac Catalyst passerar med den nya regeln; alla 23 publika filer matchar källan i båda paketen. Installerad iPhone-exekverbar matchar det nya simulator-Release-paketet byte för byte.

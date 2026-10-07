@@ -2,11 +2,15 @@
 
 Updated: 2026-10-07
 
-## Latest local change: Dynamic Type
+## Latest local change: large-text calendar
 
-The planner now follows iOS Dynamic Type. This continuation fixes the large-text header action container: grid columns previously had no effect on its landscape flex layout; four CSS lines make it a grid only for large native text. Fresh lint, 421 tests and web build pass. Latest unsigned iOS Simulator and Mac Catalyst Release builds pass and all 23 public files match source. The installed iPhone executable matches the new Release artifact. iPhone landscape at Text Size 9 visibly gives Settings the full action row; maximum 11 wraps the heading; normal 3 is restored. The existing synthetic plan still shows 7 of 5 days used after installation, but full-field preservation is not claimed.
+This pass started at `7d365cb`. At maximum native text size, November split across letters because the calendar title shared a narrow row with both arrows. The CSS now places the full-width title above the arrows and stacks the toolbar only for large native text. Normal Chrome layout is unchanged. Fresh lint, 421/421 tests and web build pass. Unsigned iOS Simulator and Mac Catalyst Release builds pass; all 23 public files match source in both bundles. The installed iPhone executable and 23 public files match the new simulator Release artifact.
 
-VoiceOver activation on the owned iPad showed its system introduction and native heading focus; further keyboard navigation produced a black simulator image of unknown cause. Disabling VoiceOver restored the image; Capture Keyboard is off. Web speech/order remain unverified. Device Hub coordinate actions subsequently failed with `noWindowsAvailable` despite rebinding, raising, zoom-to-fit and centering; AX actions still work. Full landscape date/calendar/large-text interaction, VoiceOver, fresh Catalyst runtime and physical/older-OS acceptance remain open. Durable logs, screenshots and byte-check are in `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`; see the latest dated section in `docs/qa/localhost.md`.
+Actual iPhone UI at maximum Text Size 11 verifies the complete November title, previous/next navigation, selection of 2 October, the overlapping planned stay's edit dialog and cancellation returning VoiceOver focus to that calendar day. Installation over the existing app preserves budget 5, period 1–31 October 2026 and 2 actual / 5 planned / 6 unique days. Text Size 3 and VoiceOver off are restored. Chrome at 1458 px retains its normal row layout without horizontal page overflow.
+
+Before this CSS change, the same iPhone in landscape verified invalid departure rejection, reachable actions at maximum text, correction and saving, cancellation preserving the changed plan, and confirmed JSON restoration to 2/5/6. The full inline error was not readable in the maximum-text landscape capture. VoiceOver touch focus, double-tap activation, add/cancel focus return and month/year switching were visually verified; spoken labels, complete focus order and error reading were not. Coordinate interaction recovered in this pass; the earlier `noWindowsAvailable` observation below is historical.
+
+Remaining acceptance: complete large-text form/year/landscape-calendar and iPad matrix, VoiceOver speech/order/error reading, fresh Catalyst runtime, physical devices/older OS and real participant usability. This is a bounded local fix, not full production acceptance. Durable evidence and a five-step UI script are in `docs/qa/localhost.md` and `/Users/admin/Documents/ChatGPT/sverige-qa-20261007/`.
 
 ## Previous verified state
 
