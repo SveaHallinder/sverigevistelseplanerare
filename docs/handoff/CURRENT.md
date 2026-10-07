@@ -1,10 +1,16 @@
 # Current handoff
 
-Updated: 2026-10-06
+Updated: 2026-10-07
 
 ## Current state
 
-The user will handle App Store publication. The current task is local functionality and UX in Chrome; publisher identity, signing, policy URLs and Apple review are not prerequisites for local work. Sweden calendar-day calculation applies independently of Swedish city. No foreign-country rules or city/GPS schema are part of the current app.
+The user will handle App Store publication. The current target is a production-quality local app, including native iPhone/iPad verification; publisher identity, signing, policy URLs and Apple review are not prerequisites for local implementation. Chrome remains the selected browser. Sweden calendar-day calculation applies independently of Swedish city. No foreign-country rules or city/GPS schema are part of the current app.
+
+Release verification started on `634c390`: unsigned iOS device, iOS Simulator and Mac Catalyst Release builds pass with Xcode 27, and all 23 bundled public files match source bytes. The actual Mac Release executable passed saved-plan startup, native invalid-date rejection with a full visible error/footer, exact JSON/CSV export bytes (844/114), real file-chooser restore/confirmation and cold process restart preserving 2/5/6. Evidence: `/tmp/sverige-production-qa-20261006/`; build logs: `/tmp/sverige-production-{ios,simulator,mac}-20261006.log`. Product source remains `235d2e1`.
+
+Fresh `npm run check` on 2026-10-07 passes lint, 421/421 tests and build. The explicit Release command added to README also builds successfully; its 23 bundled public files match source. Logs: `/tmp/sverige-production-check-20261007.log` and `/tmp/sverige-readme-release-build-20261007.log`.
+
+The user approved Apple's runtime download on 2026-10-06. Xcode 27's simulator UI is Device Hub at `/Applications/Xcode.app/Contents/Applications/DeviceHub.app`. No runnable iOS runtime exists at the 2026-10-07 check. CLI and Xcode Components downloads remained in preparation; MobileAsset logged database/signature errors of unknown cause. A direct HTTPS download of the Apple-catalogued iOS 27 arm64 archive is being resumed in `/tmp/sverige-ios-runtime-20261006/` by `resume-runtime.py`; its log is `/tmp/sverige-ios-runtime-resume-20261006.log`. Partial files are not verified or installed. Require the complete expected size/SHA-256 and normal Apple installation/signature checks before running it; no verification bypass is authorized. Do not download another copy while this process is active. iPhone/iPad UI, accessibility, file flows, restart and update remain untested.
 
 Product commit: `235d2e10fc6b7d088b21077b16be798025c58122` (`235d2e1`) on `design/apple-esque-makeover`; this pass started at `2c13680`. Demo now preserves an unsaved first-plan draft, including blank budget text, voluntary answers and expanded questions. Entry/exit focus is explicit. The close target is 44×44 px, primary hover contrast is 5.57:1, and native date controls fit their fields without stretching the other field when an error is present. No dependency, storage schema or calculation/legal rule changed.
 

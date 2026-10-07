@@ -1,6 +1,6 @@
-# Produktdemo och lanseringsunderlag
+# Produktstatus och lanseringsunderlag
 
-Uppdaterat 2026-10-06 med lokal QA. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
+Uppdaterat 2026-10-07 med Release-kontroller och pågående simulatorhämtning. Målet är en produktionsapp lokalt. Publiceringsunderlaget från 2026-10-05 är oförändrat. Detta är ett granskningsbart lokalt produktpaket, inte ett besked om juridisk korrekthet eller godkänd distribution. Användaren hanterar App Store-publiceringen; utgivaruppgifter och signering är separata från den lokala appens arbete.
 
 ## Vad produkten gör
 
@@ -40,11 +40,11 @@ Det detaljerade protokollet finns i [localhost-QA](../qa/localhost.md). Kör all
 | Yta | Verifierat | Kvar |
 | --- | --- | --- |
 | Webb i Chrome | Inmatning, överlapp, datumfel, backupförhandsvisning, sparande och omladdning; slutlig datum-CSS vid 320/390/667/768/1440 px samt riktig 200 % zoom utan sidöverflow, med synlig sparrad och fungerande redigering/filåterställning | Verkliga användartester, slutlig kompatibilitetsmatris; senaste exportfilerna är inte byteverifierade enligt det daterade QA-protokollet |
-| Native Mac Catalyst | Kör appens lokala origin; verklig JSON-import/bekräftelse, storleksavvisning, JSON/CSV-export med exakt filinnehåll, exportavbrott och plan efter avslut/omstart; slutlig datumfelvy visuellt verifierad efter native-datumval | Signerad sandbox/provider; återkommande vit fångst med okänd orsak enligt QA-protokollet |
-| Native iPhone/iPad | Generiskt osignerat iOS Simulator-bygge kompilerar med Xcode 27 | Simulatorruntime/fysisk enhet, datumkontroller, VoiceOver, Dynamic Type, filproviders, omstart och uppdatering |
+| Native Mac Catalyst | Release kompilerar och kör appens lokala origin; datumfel, riktig JSON-import/bekräftelse, JSON/CSV-export med exakt filinnehåll och plan efter kall omstart verifierade i Release. Tidigare Debug-pass omfattar också storleksavvisning och exportavbrott | Signerad sandbox/provider; återkommande vit fångst med okänd orsak enligt QA-protokollet |
+| Native iPhone/iPad | Osignerade Release-byggen för iOS-enhet och iOS Simulator kompilerar med Xcode 27; alla 23 bundlade webbfiler matchar källan | Hämtningen av runtime är godkänd och påbörjad. Körning, datumkontroller, tangentbord, VoiceOver, Dynamic Type, filproviders, omstart och uppdatering kvarstår |
 | App Store | Xcode-projekt, delad scheme och appikon finns | Utgivare, signering, metadata, support/policy-URL, screenshots, avtal och Apple-granskning |
 
-En grön testsvit eller ett osignerat bygge bevisar inte App Store-acceptans. Aktuell dator har inga giltiga distributionssigneringsidentiteter enligt `security find-identity -v -p codesigning`; ingen fungerande iOS-simulatorruntime fanns vid inventeringen. Runtime hämtas först efter användarens svar på installationsfrågan.
+En grön testsvit eller ett osignerat bygge bevisar inte App Store-acceptans. Vid den tidigare inventeringen saknades giltiga distributionssigneringsidentiteter enligt `security find-identity -v -p codesigning`. Simulatorhämtningen godkändes 2026-10-06; vid kontrollen 2026-10-07 är arkivet fortfarande ofullständigt och ingen körbar runtime installerad. iPhone/iPad är därför inte sluttestade.
 
 Matematiska regressioner, fem tidszoner och oberoende referensfall är godkända enligt QA-protokollet. En absolut garanti om alla situationer eller juridisk korrekthet kan inte ges från dessa tester. Verktyget kan demonstreras lokalt för en möjlig köpare; verifiering på målplattform och ett verkligt avtal behöver föregå en bindande leverans.
 

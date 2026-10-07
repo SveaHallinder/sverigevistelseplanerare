@@ -2,7 +2,7 @@
 
 Kör `npm run dev` och öppna URL:en som servern skriver ut.
 
-## Snabb QA för aktuell produktdemo
+## Snabb QA för lokal app
 
 Använd en separat webbläsarprofil med syntetiska testdata. `localhost` och `127.0.0.1` har separata lagringsutrymmen; behåll samma URL under testet.
 
@@ -12,6 +12,19 @@ Använd en separat webbläsarprofil med syntetiska testdata. `localhost` och `12
 4. Öppna Inställningar, skriv budget 13 och fäll ut frågorna. Välj en ogiltig JSON-fil: fel ska synas vid filkontrollerna medan utkastet och frågorna bevaras. Avbryt inställningarna; sparad budget ska fortfarande vara 5 och fokus återgå till Inställningar.
 5. Välj backupen från steg 2. Förhandsgranskningen ska lämna 2/4/5 oförändrat och blockera redigering före bekräftelse. Avbryt, välj samma fil igen och bekräfta: 2/5/6 och 1 över budget ska återkomma och finnas kvar efter omladdning.
 6. Kontrollera månad/år, årsskifte, tangentbord och 320/390/768/1440 px samt 667×375. Budgetperioden ska inte ändras. Datumfält med fel ska ligga jämnt och rymmas i dialogen; stängknappen ska vara minst 44×44 px och sparraden synlig även med utfälld beräkning. Upprepa huvudflödet mot `npm run preview`. Riktig 200-procentszoom och native iPhone/iPad ska kontrolleras separat; simulator/enhet är en förutsättning för det senare.
+
+## Release-kontroller 2026-10-06 och iOS-testförberedelse 2026-10-07
+
+Användaren efterfrågar en produktionsapp lokalt och hanterar publiceringen själv. Produktkoden är oförändrad från `235d2e1`; Release-kontrollen utgick från dokumentationscommit `634c390`.
+
+Färsk `npm run check` 2026-10-07 passerar lint, **421/421 tester** och build (`/tmp/sverige-production-check-20261007.log`). Release-kommandot i README kördes också: build passerar och paketets 23 publika webbfiler matchar källan (`/tmp/sverige-readme-release-build-20261007.log`).
+
+- Osignerade **Release-byggen för iOS-enhet, iOS Simulator och Mac Catalyst passerar** med Xcode 27. Release använder Swift-optimering `-O`; alla 23 publika webbfiler matchar källan byte för byte i samtliga tre paket. Byggloggar ligger i `/tmp/sverige-production-{ios,simulator,mac}-20261006.log`. Enda observerade byggvarningen gäller utebliven AppIntents-metadata; appen har ingen AppIntents-funktion.
+- Mac Catalyst körde det faktiska Release-programmet, verifierat genom processens sökväg. Kall start visade sparad budget 5 och 2 faktiska / 5 planerade / 6 unika dagar. Den inbyggda datumväljaren valde ankomst 7 oktober och avresa 2 oktober; sparande stoppades, rätt avresefält fokuserades och hela feltexten/sparraden syntes. Avbryt bevarade sparade vistelser.
+- Release exporterade JSON och CSV genom systemets filpanel till `/tmp/sverige-production-qa-20261006/`. Filerna är 844/114 bytes och matchar tidigare kanoniska filer exakt. Riktig filväljare läste den exporterade JSON-filen, visade separat ersättningsbekräftelse och återställde samma syntetiska plan. Avslut och ny processstart bevarade budget, vistelser och 2/5/6. Bildbevis finns i samma mapp: `mac-release-start.jpg`, `mac-release-date-error.jpg`, `mac-release-restore-preview.jpg` och `mac-release-restart.jpg`.
+- Användaren godkände simulatorhämtningen 2026-10-06. Ingen körbar runtime finns ännu vid kontrollen 2026-10-07. Två CLI-försök och Xcodes komponentvy stannade vid förberedelse; MobileAsset-loggen rapporterade samtidigt databas-/signaturfel, utan fastställd orsak. Hämtning från Apples HTTPS-filserver har därefter överfört delar av runtimearkivet. Ofullständiga bytes är inte en installerad eller verifierad runtime. Full SHA-256-kontroll och installation återstår; ingen signaturkontroll har kopplats bort.
+
+**iPhone/iPad har fortfarande inte körts.** Datumkontroller, tangentbord, VoiceOver, Dynamic Type, native filflöden, omstart och uppdatering på målplattform kvarstår. Release-kompilering och Mac-körning ersätter inte dessa kontroller. Den tidigare återkommande vita Mac-fångstens orsak är fortfarande okänd; positiva bilder i detta pass bevisar endast de observerade vyerna.
 
 ## Slutkontroller verifierade 2026-10-06
 

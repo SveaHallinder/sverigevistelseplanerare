@@ -1,6 +1,6 @@
 # Sverigevistelseplaneraren
 
-Ett lokalt verktyg för att dokumentera och planera registrerade Sverigedagar, med webbversion och ett native testbygge för iPhone/iPad.
+Ett lokalt verktyg för att dokumentera och planera registrerade Sverigedagar, med webbversion och nativeapp för iPhone/iPad.
 
 ## Förutsättning
 
@@ -36,13 +36,25 @@ Det aktuella webbflödet är testat i Chrome. Koden har fallback för bland anna
 
 Se [localhost-QA](docs/qa/localhost.md) för verifierade resultat och kvarvarande kompatibilitetskontroller.
 
-## Native testbygge
+## Native app
 
 ~~~bash
 node scripts/build-ios.mjs
 ~~~
 
-Kommandot paketerar samma webbgränssnitt och beräkningar i `native/ios/Web/` och bygger ett osignerat iOS Simulator-bygge. Projektet har en delad Xcode-scheme för iPhone och iPad, deployment target iOS 16. Ingen simulatorruntime hämtas automatiskt.
+Kommandot paketerar samma webbgränssnitt och beräkningar i `native/ios/Web/` och bygger ett osignerat Debug-bygge för iOS Simulator. Projektet har en delad Xcode-scheme för iPhone och iPad, deployment target iOS 16. Ingen simulatorruntime hämtas automatiskt.
+
+Bygg den optimerade Release-konfigurationen för lokal simulator-QA:
+
+~~~bash
+node scripts/build-ios.mjs --stage-only
+xcodebuild -project native/ios/Sverigevistelseplaneraren.xcodeproj \
+  -scheme Sverigevistelseplaneraren -configuration Release \
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath native/ios/build CODE_SIGNING_ALLOWED=NO build
+~~~
+
+Paketet finns i `native/ios/build/Build/Products/Release-iphonesimulator/Sverigevistelseplaneraren.app`. Körning kräver en installerad iOS-runtime; i Xcode 27 hanteras simulatorerna i [Device Hub](https://developer.apple.com/documentation/xcode/device-hub). Projektets Archive-action använder också Release. Det lokala kommandot ovan signerar ingen distribution.
 
 För lokal körning på Mac via Mac Catalyst:
 
@@ -82,7 +94,7 @@ Båda tidigare sprintplanerna är genomförda:
 Referenser:
 
 - [Pågående kommersiell hårdsäkring och nativepaket](docs/superpowers/plans/2026-10-05-commercial-readiness.md)
-- [Produktdemo och lanseringsstatus](docs/release/readiness.md)
+- [Produktstatus och lanseringsunderlag](docs/release/readiness.md)
 - [Aktuellt localhost-QA](docs/qa/localhost.md)
 - [Implementerad MVP-design](docs/superpowers/specs/2026-08-16-sverigevistelseplanerare-design.md)
 - [Historisk MVP-plan](docs/superpowers/plans/2026-08-16-sverigevistelseplanerare-mvp.md)
